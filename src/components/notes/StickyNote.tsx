@@ -40,11 +40,12 @@ export const StickyNote = ({ note, isSelected, onSelect }: StickyNoteProps) => {
     const scaleY = node.scaleY();
     node.scaleX(1);
     node.scaleY(1);
+    // Use note.size (not node.width/height — Group dimensions are unreliable)
     updateElement(currentBoardId, note.id, {
       position: { x: node.x(), y: node.y() },
       size: {
-        width:  Math.max(100, node.width()  * scaleX),
-        height: Math.max(80,  node.height() * scaleY),
+        width:  Math.max(100, note.size.width  * scaleX),
+        height: Math.max(80,  note.size.height * scaleY),
       },
     });
   };
@@ -112,7 +113,8 @@ export const StickyNote = ({ note, isSelected, onSelect }: StickyNoteProps) => {
     if (editing) openEditor();
   }, [editing]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const isSelectTool = useBoardStore.getState().currentTool === 'select';
+  const currentTool  = useBoardStore.getState().currentTool;
+  const isSelectTool = currentTool === 'select';
 
   return (
     <>

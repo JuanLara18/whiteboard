@@ -46,8 +46,12 @@ export interface DrawingElement {
 
 export type BoardElement = StickyNote | DrawingElement;
 
+export type ToolId = 'select' | 'pan' | 'sticky-note' | 'pen' | 'eraser-stroke' | 'eraser-area';
+
+const MAX_HISTORY = 40;
+
 interface BoardStore {
-  // Board management
+  // ── Board management ────────────────────────────────────────────────────────
   boards: Board[];
   currentBoardId: string | null;
   createBoard: (name: string, template?: BoardTemplate) => void;
@@ -56,31 +60,28 @@ interface BoardStore {
   deleteBoard: (id: string) => void;
   renameBoard: (id: string, name: string) => void;
 
-  // Element management
+  // ── Element management ───────────────────────────────────────────────────────
   selectedElements: string[];
-  setSelectedElements: (elementIds: string[]) => void;
+  setSelectedElements: (ids: string[]) => void;
   clearSelection: () => void;
   addElement: (boardId: string, element: BoardElement) => void;
-  updateElement: (
-    boardId: string,
-    element: BoardElement | string,
-    updates?: Partial<BoardElement>
-  ) => void;
+  updateElement: (boardId: string, element: BoardElement | string, updates?: Partial<BoardElement>) => void;
   deleteElement: (boardId: string, elementId: string) => void;
+  deleteElements: (boardId: string, elementIds: string[]) => void;
   deleteSelectedElements: (boardId: string) => void;
 
-  // Tool state
-  currentTool: 'select' | 'pan' | 'sticky-note' | 'pen';
-  setCurrentTool: (tool: 'select' | 'pan' | 'sticky-note' | 'pen') => void;
+  // ── Tool state ───────────────────────────────────────────────────────────────
+  currentTool: ToolId;
+  setCurrentTool: (tool: ToolId) => void;
 
-  // Zoom state
+  // ── Zoom ────────────────────────────────────────────────────────────────────
   zoomLevel: number;
   setZoom: (level: number) => void;
   zoomIn: () => void;
   zoomOut: () => void;
   resetZoom: () => void;
 
-  // Drawing settings
+  // ── Drawing settings ─────────────────────────────────────────────────────────
   penColor: string;
   penWidth: number;
   setPenColor: (color: string) => void;
@@ -89,42 +90,95 @@ interface BoardStore {
   simplify: boolean;
   setSmoothing: (n: number) => void;
   setSimplify: (v: boolean) => void;
+
+  // ── Undo / Redo ──────────────────────────────────────────────────────────────
+  past: Board[][];
+  future: Board[][];
+  undo: () => void;
+  redo: () => void;
+  canUndo: () => boolean;
+  canRedo: () => boolean;
 }
 
 export const useBoardStore = (create as any)(
   persist(
     (set: any, get: () => BoardStore) => ({
-      boards: [],
-      currentBoardId: null,
+      boards:           [],
+      currentBoardId:   null,
       selectedElements: [],
-      currentTool: 'select',
-      zoomLevel: 1,
-      penColor: '#111827',
-      penWidth: 2,
-      smoothing: 3,
-      simplify: true,
+      currentTool:      'select' as ToolId,
+      zoomLevel:        1,
+      penColor:         '#111827',
+      penWidth:         2,
+      smoothing:        3,
+      simplify:         true,
+      past:             [],
+      future:           [],
 
+      // ── History helpers (internal) ───────────────────────────────────────────
+      canUndo: () => get().past.length > 0,
+      canRedo: () => get().future.length > 0,
+
+      undo: () => {
+        set((state: BoardStore) => {
+          if (state.past.length === 0) return {};
+          const previous = state.past[state.past.length - 1];
+          const restoredId = previous.some((b: Board) => b.id === state.currentBoardId)
+            ? state.currentBoardId
+            : previous.length > 0 ? previous[0].id : null;
+          return {
+            boards:         previous,
+            currentBoardId: restoredId,
+            past:           state.past.slice(0, -1),
+            future:         [state.boards, ...state.future.slice(0, MAX_HISTORY - 1)],
+            selectedElements: [],
+          };
+        });
+      },
+
+      redo: () => {
+        set((state: BoardStore) => {
+          if (state.future.length === 0) return {};
+          const next = state.future[0];
+          const restoredId = next.some((b: Board) => b.id === state.currentBoardId)
+            ? state.currentBoardId
+            : next.length > 0 ? next[0].id : null;
+          return {
+            boards:         next,
+            currentBoardId: restoredId,
+            past:           [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+            future:         state.future.slice(1),
+            selectedElements: [],
+          };
+        });
+      },
+
+      // ── Board actions ────────────────────────────────────────────────────────
       selectBoard: (boardId: string) => {
         set({ currentBoardId: boardId, selectedElements: [] });
       },
 
       createBoard: (name: string, template?: BoardTemplate) => {
         const newBoard: Board = {
-          id: `board_${Date.now()}`,
+          id:        `board_${Date.now()}`,
           name,
-          elements: [],
-          template: template || getDefaultTemplate(),
+          elements:  [],
+          template:  template || getDefaultTemplate(),
           createdAt: Date.now(),
           updatedAt: Date.now(),
         };
         set((state: BoardStore) => ({
-          boards: [...state.boards, newBoard],
+          past:           [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+          future:         [],
+          boards:         [...state.boards, newBoard],
           currentBoardId: newBoard.id,
         }));
       },
 
       updateBoard: (boardId: string, updates: Partial<Board>) => {
         set((state: BoardStore) => ({
+          past:   [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+          future: [],
           boards: state.boards.map((board: Board) =>
             board.id === boardId
               ? { ...board, ...updates, updatedAt: Date.now() }
@@ -137,11 +191,12 @@ export const useBoardStore = (create as any)(
         set((state: BoardStore) => {
           const remaining = state.boards.filter((b: Board) => b.id !== boardId);
           return {
-            boards: remaining,
-            currentBoardId:
-              state.currentBoardId === boardId
-                ? remaining.length > 0 ? remaining[0].id : null
-                : state.currentBoardId,
+            past:           [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+            future:         [],
+            boards:         remaining,
+            currentBoardId: state.currentBoardId === boardId
+              ? (remaining.length > 0 ? remaining[0].id : null)
+              : state.currentBoardId,
             selectedElements: [],
           };
         });
@@ -149,6 +204,8 @@ export const useBoardStore = (create as any)(
 
       renameBoard: (boardId: string, newName: string) => {
         set((state: BoardStore) => ({
+          past:   [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+          future: [],
           boards: state.boards.map((board: Board) =>
             board.id === boardId
               ? { ...board, name: newName, updatedAt: Date.now() }
@@ -157,8 +214,11 @@ export const useBoardStore = (create as any)(
         }));
       },
 
+      // ── Element actions ──────────────────────────────────────────────────────
       addElement: (boardId: string, element: BoardElement) => {
         set((state: BoardStore) => ({
+          past:   [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+          future: [],
           boards: state.boards.map((board: Board) =>
             board.id === boardId
               ? { ...board, elements: [...board.elements, element], updatedAt: Date.now() }
@@ -167,15 +227,13 @@ export const useBoardStore = (create as any)(
         }));
       },
 
-      updateElement: (
-        boardId: string,
-        element: BoardElement | string,
-        updates?: Partial<BoardElement>
-      ) => {
+      updateElement: (boardId: string, element: BoardElement | string, updates?: Partial<BoardElement>) => {
         set((state: BoardStore) => {
           const isPartial = typeof element === 'string';
           const elementId = isPartial ? element : (element as BoardElement).id;
           return {
+            past:   [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+            future: [],
             boards: state.boards.map((board: Board) =>
               board.id === boardId
                 ? {
@@ -195,6 +253,8 @@ export const useBoardStore = (create as any)(
 
       deleteElement: (boardId: string, elementId: string) => {
         set((state: BoardStore) => ({
+          past:   [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+          future: [],
           boards: state.boards.map((board: Board) =>
             board.id === boardId
               ? {
@@ -204,23 +264,42 @@ export const useBoardStore = (create as any)(
                 }
               : board
           ),
-          selectedElements: (state.selectedElements as string[]).filter(
-            (id: string) => id !== elementId
+          selectedElements: (state.selectedElements as string[]).filter((id: string) => id !== elementId),
+        }));
+      },
+
+      // Delete multiple elements as a single undo step
+      deleteElements: (boardId: string, elementIds: string[]) => {
+        if (elementIds.length === 0) return;
+        const idSet = new Set(elementIds);
+        set((state: BoardStore) => ({
+          past:   [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+          future: [],
+          boards: state.boards.map((board: Board) =>
+            board.id === boardId
+              ? {
+                  ...board,
+                  elements:  board.elements.filter((el: BoardElement) => !idSet.has(el.id)),
+                  updatedAt: Date.now(),
+                }
+              : board
           ),
+          selectedElements: (state.selectedElements as string[]).filter((id: string) => !idSet.has(id)),
         }));
       },
 
       deleteSelectedElements: (boardId: string) => {
         const { selectedElements } = get();
         if (selectedElements.length === 0) return;
+        const idSet = new Set(selectedElements as string[]);
         set((state: BoardStore) => ({
+          past:   [...state.past.slice(-(MAX_HISTORY - 1)), state.boards],
+          future: [],
           boards: state.boards.map((board: Board) =>
             board.id === boardId
               ? {
                   ...board,
-                  elements: board.elements.filter(
-                    (el: BoardElement) => !selectedElements.includes(el.id)
-                  ),
+                  elements:  board.elements.filter((el: BoardElement) => !idSet.has(el.id)),
                   updatedAt: Date.now(),
                 }
               : board
@@ -229,55 +308,38 @@ export const useBoardStore = (create as any)(
         }));
       },
 
-      setSelectedElements: (elementIds: string[]) => {
-        set({ selectedElements: elementIds });
-      },
+      setSelectedElements: (ids: string[]) => set({ selectedElements: ids }),
+      clearSelection:      ()              => set({ selectedElements: [] }),
 
-      clearSelection: () => {
-        set({ selectedElements: [] });
-      },
+      setCurrentTool: (tool: string) => set({ currentTool: tool, selectedElements: [] }),
 
-      setCurrentTool: (tool: string) => {
-        set({ currentTool: tool, selectedElements: [] });
-      },
+      // ── Zoom ────────────────────────────────────────────────────────────────
+      setZoom: (level: number) => set({ zoomLevel: Math.max(0.1, Math.min(5, level)) }),
+      zoomIn:  () => { const { zoomLevel, setZoom } = get(); setZoom(zoomLevel * 1.2); },
+      zoomOut: () => { const { zoomLevel, setZoom } = get(); setZoom(zoomLevel / 1.2); },
+      resetZoom: () => set({ zoomLevel: 1 }),
 
-      setZoom: (level: number) => {
-        set({ zoomLevel: Math.max(0.1, Math.min(5, level)) });
-      },
-
-      zoomIn: () => {
-        const { zoomLevel, setZoom } = get();
-        setZoom(zoomLevel * 1.2);
-      },
-
-      zoomOut: () => {
-        const { zoomLevel, setZoom } = get();
-        setZoom(zoomLevel / 1.2);
-      },
-
-      resetZoom: () => {
-        set({ zoomLevel: 1 });
-      },
-
-      setPenColor: (color: string) => set({ penColor: color }),
-      setPenWidth: (width: number) => set({ penWidth: Math.max(1, Math.min(20, width)) }),
-      setSmoothing: (n: number) => set({ smoothing: Math.max(1, Math.min(15, Math.round(n))) }),
-      setSimplify: (v: boolean) => set({ simplify: v }),
+      // ── Drawing settings ─────────────────────────────────────────────────────
+      setPenColor:  (color: string) => set({ penColor: color }),
+      setPenWidth:  (width: number) => set({ penWidth: Math.max(1, Math.min(20, width)) }),
+      setSmoothing: (n: number)     => set({ smoothing: Math.max(1, Math.min(15, Math.round(n))) }),
+      setSimplify:  (v: boolean)    => set({ simplify: v }),
     }),
     {
       name: 'whiteboard-storage',
+      // past/future are intentionally excluded — no need to persist history
       partialize: (state: BoardStore) => ({
-        boards: state.boards,
-        currentBoardId: state.currentBoardId,
-        currentTool: state.currentTool,
-        zoomLevel: state.zoomLevel,
-        penColor: state.penColor,
-        penWidth: state.penWidth,
-        smoothing: state.smoothing,
-        simplify: state.simplify,
+        boards:        state.boards,
+        currentBoardId:state.currentBoardId,
+        currentTool:   state.currentTool,
+        zoomLevel:     state.zoomLevel,
+        penColor:      state.penColor,
+        penWidth:      state.penWidth,
+        smoothing:     state.smoothing,
+        simplify:      state.simplify,
       }),
       onRehydrateStorage: () => (state: BoardStore | undefined) => {
-        // One-time migration: import boards from the old storage key
+        // One-time migration from old storage key
         if (!state || state.boards.length > 0) return;
         try {
           const raw = localStorage.getItem('whiteboard.boards');
@@ -289,9 +351,7 @@ export const useBoardStore = (create as any)(
             }
             localStorage.removeItem('whiteboard.boards');
           }
-        } catch {
-          // Migration failed silently — no data loss, just a fresh start
-        }
+        } catch { /* silent */ }
       },
     }
   )

@@ -1,6 +1,6 @@
 // src/components/canvas/Canvas.tsx
 import { useRef, useState, useEffect, useCallback, Fragment } from 'react';
-import { Stage, Layer, Line } from 'react-konva';
+import { Stage, Layer, Line, Rect } from 'react-konva';
 import { useBoardStore, Board, BoardElement } from '../../store/boardStore';
 import { StickyNote } from '../notes/StickyNote';
 import { designSystem } from '../../styles/design-system';
@@ -12,6 +12,30 @@ interface CanvasProps {
   board: Board;
 }
 
+// ── Intersection helpers for area-eraser ─────────────────────────────────────
+const pointInRect = (px: number, py: number, rx: number, ry: number, rw: number, rh: number) => {
+  const x0 = Math.min(rx, rx + rw), x1 = Math.max(rx, rx + rw);
+  const y0 = Math.min(ry, ry + rh), y1 = Math.max(ry, ry + rh);
+  return px >= x0 && px <= x1 && py >= y0 && py <= y1;
+};
+
+const strokeInRect = (points: number[], rx: number, ry: number, rw: number, rh: number) => {
+  for (let i = 0; i < points.length - 1; i += 2) {
+    if (pointInRect(points[i], points[i + 1], rx, ry, rw, rh)) return true;
+  }
+  return false;
+};
+
+const noteInRect = (
+  nx: number, ny: number, nw: number, nh: number,
+  rx: number, ry: number, rw: number, rh: number,
+) => {
+  const x0 = Math.min(rx, rx + rw), x1 = Math.max(rx, rx + rw);
+  const y0 = Math.min(ry, ry + rh), y1 = Math.max(ry, ry + rh);
+  return nx < x1 && nx + nw > x0 && ny < y1 && ny + nh > y0;
+};
+
+// ─────────────────────────────────────────────────────────────────────────────
 export const Canvas = ({ board }: CanvasProps) => {
   const stageRef     = useRef(null as any);
   const containerRef = useRef(null as any);
@@ -19,20 +43,30 @@ export const Canvas = ({ board }: CanvasProps) => {
   const [scale,     setScale]     = useState(1);
   const [position,  setPosition]  = useState({ x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
-  const [isDrawing, setIsDrawing] = useState(false);
+
+  // Freehand drawing
+  const [isDrawing,     setIsDrawing]     = useState(false);
   const [currentPoints, setCurrentPoints] = useState([] as number[]);
 
-  // ── Temporary pan via Spacebar ──────────────────────────────────────────────
-  const [isSpaceDown, setIsSpaceDown] = useState(false);
+  // Area eraser
+  const [eraseRect,  setEraseRect]  = useState<{ x: number; y: number; w: number; h: number } | null>(null);
+  const eraseStart = useRef({ x: 0, y: 0 });
 
-  // ── Middle-mouse pan ────────────────────────────────────────────────────────
+  // Manual canvas pan (replaces Stage.draggable to prevent note-drag conflicts)
+  const [isPanning,    setIsPanning]    = useState(false);
+  const panStart = useRef({ mouseX: 0, mouseY: 0, stageX: 0, stageY: 0 });
+
+  // Temporary pan: spacebar held down
+  const [isSpaceDown,  setIsSpaceDown]  = useState(false);
+
+  // Middle-mouse pan
   const [isMidPanning, setIsMidPanning] = useState(false);
   const midPanOrigin = useRef({ mouseX: 0, mouseY: 0, stageX: 0, stageY: 0 });
 
   const {
     selectedElements, setSelectedElements, clearSelection,
     currentTool,
-    addElement,
+    addElement, deleteElement, deleteElements,
     penColor, penWidth, smoothing, simplify,
     setZoom, zoomLevel,
   } = useBoardStore();
@@ -55,10 +89,9 @@ export const Canvas = ({ board }: CanvasProps) => {
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // Keep local scale synced when toolbar changes zoom level
   useEffect(() => { setScale(zoomLevel); }, [zoomLevel]);
 
-  // ── Register PNG export callback ────────────────────────────────────────────
+  // ── PNG export ──────────────────────────────────────────────────────────────
   useEffect(() => {
     registerExportPNG(() => {
       const stage = stageRef.current;
@@ -71,86 +104,110 @@ export const Canvas = ({ board }: CanvasProps) => {
     });
   }, [board.name]);
 
-  // ── Spacebar global listeners ───────────────────────────────────────────────
+  // ── Spacebar (temporary pan) ─────────────────────────────────────────────────
   useEffect(() => {
     const onDown = (e: KeyboardEvent) => {
       if (e.code !== 'Space') return;
-      const target = e.target as HTMLElement;
-      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      const t = e.target as HTMLElement;
+      if (t.tagName === 'INPUT' || t.tagName === 'TEXTAREA') return;
       e.preventDefault();
       setIsSpaceDown(true);
     };
-    const onUp = (e: KeyboardEvent) => {
-      if (e.code === 'Space') setIsSpaceDown(false);
-    };
+    const onUp = (e: KeyboardEvent) => { if (e.code === 'Space') setIsSpaceDown(false); };
     window.addEventListener('keydown', onDown);
     window.addEventListener('keyup',   onUp);
-    return () => {
-      window.removeEventListener('keydown', onDown);
-      window.removeEventListener('keyup',   onUp);
-    };
+    return () => { window.removeEventListener('keydown', onDown); window.removeEventListener('keyup', onUp); };
   }, []);
 
-  // ── Wheel zoom ──────────────────────────────────────────────────────────────
+  // ── Wheel: trackpad two-finger scroll → pan, pinch / scroll wheel → zoom ────
   const handleWheel = useCallback((e: any) => {
     e.evt.preventDefault();
     const stage = stageRef.current;
     if (!stage) return;
+
+    // Browsers set ctrlKey=true for pinch-to-zoom gestures on Mac and Windows
+    // precision trackpads. Plain two-finger scroll leaves ctrlKey=false.
+    if (!e.evt.ctrlKey) {
+      // Trackpad two-finger scroll → pan
+      const cur  = stage.position() as { x: number; y: number };
+      const newX = cur.x - e.evt.deltaX;
+      const newY = cur.y - e.evt.deltaY;
+      setPosition({ x: newX, y: newY });
+      stage.position({ x: newX, y: newY });
+      stage.batchDraw();
+      return;
+    }
+
+    // Pinch-to-zoom or Ctrl+scroll → zoom toward pointer
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
-    const oldScale = scale;
     const mousePointTo = {
-      x: (pointer.x - position.x) / oldScale,
-      y: (pointer.y - position.y) / oldScale,
+      x: (pointer.x - position.x) / scale,
+      y: (pointer.y - position.y) / scale,
     };
     const newZoom = Math.max(0.1, Math.min(5, e.evt.deltaY < 0 ? zoomLevel * 1.1 : zoomLevel / 1.1));
     setZoom(newZoom);
     setScale(newZoom);
-    setPosition({
-      x: pointer.x - mousePointTo.x * newZoom,
-      y: pointer.y - mousePointTo.y * newZoom,
-    });
+    setPosition({ x: pointer.x - mousePointTo.x * newZoom, y: pointer.y - mousePointTo.y * newZoom });
   }, [scale, position, zoomLevel, setZoom]);
 
-  const handleStageDragEnd = useCallback((e: any) => {
-    setPosition({ x: e.target.x(), y: e.target.y() });
-  }, []);
-
-  // ── Pointer helpers ─────────────────────────────────────────────────────────
-  const toCanvasPoint = (pos: { x: number; y: number }) => ({
+  // ── Coordinate helper ───────────────────────────────────────────────────────
+  const toCanvas = useCallback((pos: { x: number; y: number }) => ({
     x: (pos.x - position.x) / scale,
     y: (pos.y - position.y) / scale,
-  });
+  }), [position, scale]);
 
-  // ── Mouse / touch handlers ──────────────────────────────────────────────────
+  // ── Mouse down ──────────────────────────────────────────────────────────────
   const handleMouseDown = useCallback((e: any) => {
-    // Middle mouse button — start panning
+    // Middle mouse → pan
     if (e.evt.button === 1) {
       e.evt.preventDefault();
-      const stage = stageRef.current;
-      const pos   = stage?.position() ?? { x: 0, y: 0 };
-      midPanOrigin.current = {
-        mouseX: e.evt.clientX,
-        mouseY: e.evt.clientY,
-        stageX: pos.x,
-        stageY: pos.y,
-      };
+      const pos = stageRef.current?.position() ?? { x: 0, y: 0 };
+      midPanOrigin.current = { mouseX: e.evt.clientX, mouseY: e.evt.clientY, stageX: pos.x, stageY: pos.y };
       setIsMidPanning(true);
       return;
     }
-    if (currentTool !== 'pen') return;
-    const pointer = stageRef.current?.getPointerPosition();
-    if (!pointer) return;
-    const p = toCanvasPoint(pointer);
-    setIsDrawing(true);
-    setCurrentPoints([p.x, p.y]);
-  }, [currentTool, position, scale]);
 
+    const onBackground = e.target === e.target.getStage();
+
+    // Start manual pan when:
+    //  – explicit pan tool, or spacebar held (pan from anywhere)
+    //  – select tool AND click is on the empty canvas background
+    const wantPan =
+      currentTool === 'pan' ||
+      isSpaceDown ||
+      (currentTool === 'select' && onBackground);
+
+    if (wantPan) {
+      const pos = stageRef.current?.position() ?? { x: 0, y: 0 };
+      panStart.current = { mouseX: e.evt.clientX, mouseY: e.evt.clientY, stageX: pos.x, stageY: pos.y };
+      setIsPanning(true);
+      return;
+    }
+
+    if (currentTool === 'pen') {
+      const pointer = stageRef.current?.getPointerPosition();
+      if (!pointer) return;
+      const p = toCanvas(pointer);
+      setIsDrawing(true);
+      setCurrentPoints([p.x, p.y]);
+      return;
+    }
+
+    if (currentTool === 'eraser-area') {
+      const pointer = stageRef.current?.getPointerPosition();
+      if (!pointer) return;
+      const p = toCanvas(pointer);
+      eraseStart.current = { x: p.x, y: p.y };
+      setEraseRect({ x: p.x, y: p.y, w: 0, h: 0 });
+    }
+  }, [currentTool, isSpaceDown, toCanvas]);
+
+  // ── Mouse move ──────────────────────────────────────────────────────────────
   const handleMouseMove = useCallback((e: any) => {
-    // Middle mouse pan
     if (isMidPanning) {
-      const dx = e.evt.clientX - midPanOrigin.current.mouseX;
-      const dy = e.evt.clientY - midPanOrigin.current.mouseY;
+      const dx   = e.evt.clientX - midPanOrigin.current.mouseX;
+      const dy   = e.evt.clientY - midPanOrigin.current.mouseY;
       const newX = midPanOrigin.current.stageX + dx;
       const newY = midPanOrigin.current.stageY + dy;
       setPosition({ x: newX, y: newY });
@@ -158,66 +215,109 @@ export const Canvas = ({ board }: CanvasProps) => {
       stageRef.current?.batchDraw();
       return;
     }
-    if (!isDrawing || currentTool !== 'pen') return;
-    const pointer = stageRef.current?.getPointerPosition();
-    if (!pointer) return;
-    const p = toCanvasPoint(pointer);
-    setCurrentPoints((prev: number[]) => [...prev, p.x, p.y]);
-  }, [isMidPanning, isDrawing, currentTool, position, scale]);
 
+    if (isPanning) {
+      const dx   = e.evt.clientX - panStart.current.mouseX;
+      const dy   = e.evt.clientY - panStart.current.mouseY;
+      const newX = panStart.current.stageX + dx;
+      const newY = panStart.current.stageY + dy;
+      setPosition({ x: newX, y: newY });
+      stageRef.current?.position({ x: newX, y: newY });
+      stageRef.current?.batchDraw();
+      return;
+    }
+
+    if (isDrawing && currentTool === 'pen') {
+      const pointer = stageRef.current?.getPointerPosition();
+      if (!pointer) return;
+      const p = toCanvas(pointer);
+      setCurrentPoints(prev => [...prev, p.x, p.y]);
+      return;
+    }
+
+    if (currentTool === 'eraser-area' && eraseRect) {
+      const pointer = stageRef.current?.getPointerPosition();
+      if (!pointer) return;
+      const p = toCanvas(pointer);
+      setEraseRect({
+        x: eraseStart.current.x,
+        y: eraseStart.current.y,
+        w: p.x - eraseStart.current.x,
+        h: p.y - eraseStart.current.y,
+      });
+    }
+  }, [isMidPanning, isPanning, isDrawing, currentTool, eraseRect, toCanvas]);
+
+  // ── Mouse up ────────────────────────────────────────────────────────────────
   const handleMouseUp = useCallback((e: any) => {
     if (e?.evt?.button === 1 || isMidPanning) {
       setIsMidPanning(false);
       return;
     }
-    if (!isDrawing || currentTool !== 'pen') return;
-    setIsDrawing(false);
-    if (currentPoints.length < 4) { setCurrentPoints([]); return; }
-    const smoothed = smoothing > 1 ? smoothMovingAverage(currentPoints, smoothing) : currentPoints;
-    const finalPoints = simplify ? simplifyRDP(smoothed, Math.max(1, Math.round(penWidth))) : smoothed;
-    const newDrawing: BoardElement = {
-      id:          `draw_${Date.now()}`,
-      type:        'drawing',
-      tool:        'pen',
-      points:      finalPoints,
-      strokeWidth: penWidth,
-      stroke:      penColor,
-      zIndex:      Date.now(),
-    } as any;
-    addElement(board.id, newDrawing);
-    setCurrentPoints([]);
-  }, [isMidPanning, isDrawing, currentTool, currentPoints, addElement, board.id, penColor, penWidth, smoothing, simplify]);
 
-  // Safety: release mid-pan if mouse leaves document
+    if (isPanning) {
+      setIsPanning(false);
+      return;
+    }
+
+    if (isDrawing && currentTool === 'pen') {
+      setIsDrawing(false);
+      if (currentPoints.length < 4) { setCurrentPoints([]); return; }
+      const smoothed    = smoothing > 1 ? smoothMovingAverage(currentPoints, smoothing) : currentPoints;
+      const finalPoints = simplify ? simplifyRDP(smoothed, Math.max(1, Math.round(penWidth))) : smoothed;
+      const newDrawing: BoardElement = {
+        id: `draw_${Date.now()}`, type: 'drawing', tool: 'pen',
+        points: finalPoints, strokeWidth: penWidth, stroke: penColor, zIndex: Date.now(),
+      } as any;
+      addElement(board.id, newDrawing);
+      setCurrentPoints([]);
+      return;
+    }
+
+    if (currentTool === 'eraser-area' && eraseRect) {
+      const { x, y, w, h } = eraseRect;
+      const toErase = board.elements
+        .filter((el: BoardElement) => {
+          if (el.type === 'drawing')     return strokeInRect(el.points, x, y, w, h);
+          if (el.type === 'sticky-note') return noteInRect(el.position.x, el.position.y, el.size.width, el.size.height, x, y, w, h);
+          return false;
+        })
+        .map((el: BoardElement) => el.id);
+      if (toErase.length > 0) deleteElements(board.id, toErase);
+      setEraseRect(null);
+    }
+  }, [isMidPanning, isPanning, isDrawing, currentTool, currentPoints, eraseRect,
+      addElement, deleteElements, board.id, board.elements,
+      penColor, penWidth, smoothing, simplify]);
+
+  // Stop panning when mouse is released anywhere (even outside the stage)
   useEffect(() => {
-    const onGlobalUp = (e: MouseEvent) => { if (e.button === 1) setIsMidPanning(false); };
-    document.addEventListener('mouseup', onGlobalUp);
-    return () => document.removeEventListener('mouseup', onGlobalUp);
+    const up = (e: MouseEvent) => {
+      if (e.button === 1) setIsMidPanning(false);
+      if (e.button === 0) setIsPanning(false);
+    };
+    document.addEventListener('mouseup', up);
+    return () => document.removeEventListener('mouseup', up);
   }, []);
 
+  // ── Stage click (sticky notes + deselect) ───────────────────────────────────
   const handleStageClick = useCallback((e: any) => {
     if (e.target !== e.target.getStage()) return;
-    if (currentTool === 'pen') return;
+    if (currentTool === 'pen' || currentTool === 'eraser-area') return;
+
     if (currentTool === 'sticky-note') {
       const pointer = e.target.getStage().getPointerPosition();
       if (!pointer) return;
       const noteColors = [
-        designSystem.colors.accent.yellow,
-        designSystem.colors.accent.pink,
-        designSystem.colors.accent.green,
-        designSystem.colors.accent.blue,
+        designSystem.colors.accent.yellow, designSystem.colors.accent.pink,
+        designSystem.colors.accent.green,  designSystem.colors.accent.blue,
       ];
       const newNote: BoardElement = {
-        id:      `sticky_${Date.now()}`,
-        type:    'sticky-note',
-        content: 'New Note',
-        position: {
-          x: (pointer.x - position.x) / scale,
-          y: (pointer.y - position.y) / scale,
-        },
-        size:    { width: 200, height: 150 },
-        color:   noteColors[Math.floor(Math.random() * noteColors.length)],
-        zIndex:  Date.now(),
+        id: `sticky_${Date.now()}`, type: 'sticky-note', content: 'New Note',
+        position: { x: (pointer.x - position.x) / scale, y: (pointer.y - position.y) / scale },
+        size: { width: 200, height: 150 },
+        color: noteColors[Math.floor(Math.random() * noteColors.length)],
+        zIndex: Date.now(),
       };
       addElement(board.id, newNote);
     } else {
@@ -225,30 +325,36 @@ export const Canvas = ({ board }: CanvasProps) => {
     }
   }, [currentTool, position, scale, board.id, addElement, clearSelection]);
 
+  // ── Eraser stroke: click a drawing to delete it ───────────────────────────
+  const handleEraseStroke = useCallback((id: string) => {
+    deleteElement(board.id, id);
+  }, [board.id, deleteElement]);
+
   // ── Derived ─────────────────────────────────────────────────────────────────
   const stickyNotes = board.elements.filter(el => el.type === 'sticky-note') as any[];
   const drawings    = board.elements.filter(el => el.type === 'drawing')     as any[];
 
-  const isPanMode = currentTool === 'select' || currentTool === 'pan' || isSpaceDown;
-  const cursor    = isMidPanning || (isSpaceDown && isPanMode)
-    ? 'grabbing'
-    : isSpaceDown
-      ? 'grab'
-      : currentTool === 'pen'
-        ? 'crosshair'
-        : currentTool === 'pan'
-          ? 'grab'
-          : 'default';
+  const activePanning = isMidPanning || isPanning;
+  const cursor =
+    activePanning         ? 'grabbing'
+    : isSpaceDown         ? 'grab'
+    : currentTool === 'pen'          ? 'crosshair'
+    : currentTool === 'pan'          ? 'grab'
+    : currentTool === 'eraser-area'  ? 'crosshair'
+    : currentTool === 'eraser-stroke'? 'cell'
+    : 'default';
+
+  // Visible area in canvas coordinates (for background tiling)
+  const viewX = -position.x / scale;
+  const viewY = -position.y / scale;
 
   return (
     <div
       ref={containerRef}
       className="canvas-container"
       style={{
-        width:    '100%',
-        height:   '100%',
-        overflow: 'hidden',
-        position: 'relative',
+        width: '100%', height: '100%',
+        overflow: 'hidden', position: 'relative',
         cursor,
         ...getCanvasBackgroundStyle(board.template),
       }}
@@ -258,8 +364,6 @@ export const Canvas = ({ board }: CanvasProps) => {
         width={stageSize.width}
         height={stageSize.height}
         onWheel={handleWheel}
-        draggable={isPanMode && !isDrawing && !isMidPanning}
-        onDragEnd={handleStageDragEnd}
         onClick={handleStageClick}
         scaleX={scale}
         scaleY={scale}
@@ -277,19 +381,28 @@ export const Canvas = ({ board }: CanvasProps) => {
             template={board.template}
             width={stageSize.width  / scale}
             height={stageSize.height / scale}
+            viewX={viewX}
+            viewY={viewY}
           />
+
+          {/* Saved drawings */}
           {drawings.map((d) => (
             <Line
               key={d.id}
               points={d.points}
-              stroke={d.stroke}
+              stroke={currentTool === 'eraser-stroke' ? `${d.stroke}99` : d.stroke}
               strokeWidth={d.strokeWidth}
               tension={0.4}
               lineCap="round"
               lineJoin="round"
               bezier={false}
+              hitStrokeWidth={currentTool === 'eraser-stroke' ? Math.max(24, d.strokeWidth * 4) : d.strokeWidth}
+              onClick={currentTool === 'eraser-stroke' ? () => handleEraseStroke(d.id) : undefined}
+              onTap={currentTool === 'eraser-stroke'   ? () => handleEraseStroke(d.id) : undefined}
             />
           ))}
+
+          {/* Live drawing preview */}
           {isDrawing && currentTool === 'pen' && currentPoints.length >= 2 && (
             <Line
               points={smoothing > 1 ? smoothMovingAverage(currentPoints, smoothing) : currentPoints}
@@ -301,15 +414,37 @@ export const Canvas = ({ board }: CanvasProps) => {
               bezier={false}
             />
           )}
+
+          {/* Sticky notes */}
           {stickyNotes.map((note) => (
             <Fragment key={note.id}>
               <StickyNote
                 note={note}
-                isSelected={selectedElements.includes(note.id)}
-                onSelect={() => setSelectedElements(selectedElements.includes(note.id) ? [] : [note.id])}
+                isSelected={selectedElements.includes(note.id) && currentTool === 'select'}
+                onSelect={() => {
+                  if (currentTool === 'eraser-stroke') {
+                    deleteElement(board.id, note.id);
+                  } else {
+                    setSelectedElements(selectedElements.includes(note.id) ? [] : [note.id]);
+                  }
+                }}
               />
             </Fragment>
           ))}
+
+          {/* Area eraser preview rectangle */}
+          {eraseRect && (
+            <Rect
+              x={eraseRect.w >= 0 ? eraseRect.x : eraseRect.x + eraseRect.w}
+              y={eraseRect.h >= 0 ? eraseRect.y : eraseRect.y + eraseRect.h}
+              width={Math.abs(eraseRect.w)}
+              height={Math.abs(eraseRect.h)}
+              fill="rgba(239,68,68,0.08)"
+              stroke="#EF4444"
+              strokeWidth={1.5 / scale}
+              dash={[6 / scale, 3 / scale]}
+            />
+          )}
         </Layer>
       </Stage>
     </div>

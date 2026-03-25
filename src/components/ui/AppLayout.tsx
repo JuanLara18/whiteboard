@@ -15,6 +15,8 @@ export const AppLayout = () => {
     setCurrentTool,
     deleteSelectedElements,
     createBoard,
+    undo,
+    redo,
   } = useBoardStore();
 
   const currentBoard = boards.find((board: any) => board.id === currentBoardId);
@@ -25,11 +27,29 @@ export const AppLayout = () => {
       const target = e.target as HTMLElement;
       if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
 
+      // Ctrl/Cmd shortcuts
+      if (e.ctrlKey || e.metaKey) {
+        if (e.key.toLowerCase() === 'z') {
+          e.preventDefault();
+          if (e.shiftKey) redo(); else undo();
+          return;
+        }
+        if (e.key.toLowerCase() === 'y') {
+          e.preventDefault();
+          redo();
+          return;
+        }
+      }
+
+      // Single-key tool shortcuts (no modifier)
+      if (e.ctrlKey || e.metaKey || e.altKey) return;
       switch (e.key.toLowerCase()) {
         case 's': setCurrentTool('select'); break;
         case 'p': setCurrentTool('pan'); break;
         case 'n': setCurrentTool('sticky-note'); break;
         case 'd': setCurrentTool('pen'); break;
+        case 'e': setCurrentTool('eraser-stroke'); break;
+        case 'r': setCurrentTool('eraser-area'); break;
         case 'delete':
         case 'backspace':
           if (currentBoardId && selectedElements.length > 0) {
@@ -44,7 +64,7 @@ export const AppLayout = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentBoardId, selectedElements, setCurrentTool, deleteSelectedElements]);
+  }, [currentBoardId, selectedElements, setCurrentTool, deleteSelectedElements, undo, redo]);
 
   return (
     <div style={{
