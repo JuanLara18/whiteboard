@@ -65,9 +65,7 @@ Open [http://localhost:5173](http://localhost:5173) — that's it. No database, 
 
 ## Screenshot
 
-<!-- Add a screenshot here after running the app -->
-> _Run the app and take a screenshot to add here!_  
-> Replace this section with: `![Whiteboard screenshot](docs/screenshot.png)`
+![Whiteboard app — boards, toolbar, canvas with drawing and sticky notes](docs/screenshot.png)
 
 ---
 
