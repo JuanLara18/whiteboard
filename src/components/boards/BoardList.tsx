@@ -6,7 +6,7 @@ import { StyledModal, StyledInput, StyledButton } from '../ui/StyledComponents';
 import { useBoardStore } from '../../store/boardStore';
 import { BOARD_TEMPLATES } from '../../constants/boardTemplates';
 import { TemplatePreview } from './TemplatePreview';
-import { IconGrid, IconPencil, IconX } from '../ui/Icons';
+import { IconPencil, IconX } from '../ui/Icons';
 
 // ── Sidebar-specific tokens ───────────────────────────────────────────────────
 const SB = {
@@ -137,23 +137,16 @@ export const BoardList = () => {
       {/* Board list */}
       <div style={{ flex: 1, overflowY: 'auto', padding: spacing[2] }}>
         {boards.length === 0 ? (
-          <div style={{ padding: `${spacing[8]} ${spacing[3]}`, textAlign: 'center' }}>
-            <div style={{
-              marginBottom: spacing[3],
-              opacity: 0.45,
-              color: SB.textMuted,
-              display: 'flex',
-              justifyContent: 'center',
-            }}>
-              <IconGrid size={36} />
-            </div>
-            <p style={{ fontSize: '12px', color: SB.textMuted, marginBottom: spacing[4], lineHeight: 1.6 }}>
-              No boards yet.<br />Create one to get started.
-            </p>
-            <SbBtn variant="primary" onClick={() => setIsCreateOpen(true)}>
-              Create board
-            </SbBtn>
-          </div>
+          <p style={{
+            padding: `${spacing[6]} ${spacing[3]}`,
+            margin: 0,
+            textAlign: 'center',
+            fontSize: '12px',
+            color: SB.textMuted,
+            lineHeight: 1.5,
+          }}>
+            No boards yet
+          </p>
         ) : (
           boards.map((board: { id: string; name: string; elements: any[] }) => {
             const isActive = currentBoardId === board.id;

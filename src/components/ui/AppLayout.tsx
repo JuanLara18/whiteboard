@@ -1,10 +1,8 @@
 // src/components/ui/AppLayout.tsx
 import { useEffect } from 'react';
 import { colors, layout, spacing } from '../../styles/design-system';
-import { StyledButton } from './StyledComponents';
 import { BoardList } from '../boards/BoardList';
 import { Toolbar } from './Toolbar';
-import { IconGrid } from './Icons';
 import { Canvas } from '../canvas/Canvas';
 import { useBoardStore } from '../../store/boardStore';
 
@@ -15,7 +13,6 @@ export const AppLayout = () => {
     selectedElements,
     setCurrentTool,
     deleteSelectedElements,
-    createBoard,
     undo,
     redo,
   } = useBoardStore();
@@ -83,7 +80,7 @@ export const AppLayout = () => {
           {currentBoard ? (
             <Canvas key={currentBoard.id} board={currentBoard} />
           ) : (
-            /* ── Empty / welcome state ── */
+            /* ── Empty state: no board selected ── */
             <div style={{
               height:         '100%',
               display:        'flex',
@@ -93,48 +90,29 @@ export const AppLayout = () => {
               padding:        spacing[8],
               textAlign:      'center',
             }}>
-              <div style={{
-                width:        80,
-                height:       80,
-                background:   `linear-gradient(135deg, ${colors.primary[600]} 0%, ${colors.primary[800]} 100%)`,
-                borderRadius: '20px',
-                display:      'flex',
-                alignItems:   'center',
-                justifyContent:'center',
-                marginBottom: spacing[6],
-                boxShadow:    `0 8px 24px rgba(99,102,241,0.3)`,
-                color:        colors.white,
-              }}>
-                <IconGrid size={40} />
-              </div>
               <h2 style={{
-                fontSize:     '22px',
-                fontWeight:   700,
-                color:        colors.gray[800],
-                margin:       `0 0 ${spacing[3]}`,
+                fontSize:     '17px',
+                fontWeight:   600,
+                color:        colors.gray[700],
+                margin:       `0 0 ${spacing[2]}`,
+                letterSpacing: '-0.02em',
               }}>
-                Whiteboard
+                No board open
               </h2>
               <p style={{
-                fontSize:     '14px',
+                fontSize:     '13px',
                 color:        colors.gray[500],
-                marginBottom: spacing[6],
-                maxWidth:     '320px',
-                lineHeight:   1.6,
-                margin:       `0 0 ${spacing[6]}`,
+                maxWidth:     '280px',
+                lineHeight:   1.55,
+                margin:       0,
               }}>
-                Sketch ideas, add sticky notes, draw freely.<br />
-                Everything saves automatically to your browser.
-              </p>
-              <StyledButton variant="primary" onClick={() => createBoard('Untitled')}>
-                Create your first board
-              </StyledButton>
-              <p style={{
-                marginTop:  spacing[5],
-                fontSize:   '12px',
-                color:      colors.gray[400],
-              }}>
-                Or use the sidebar on the left
+                {boards.length === 0 ? (
+                  <>
+                    Use <span style={{ fontWeight: 600, color: colors.gray[700] }}>New</span> in the sidebar to create a board.
+                  </>
+                ) : (
+                  <>Select a board in the sidebar to open it here.</>
+                )}
               </p>
             </div>
           )}
