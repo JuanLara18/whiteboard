@@ -141,7 +141,10 @@ export const Toolbar = () => {
     backgroundColor: layout.toolbar.backgroundColor,
     borderBottom: `1px solid ${layout.toolbar.borderColor}`,
     boxShadow: shadows.sm,
-    flexShrink: 0, overflowX: 'auto', overflowY: 'hidden',
+    flexShrink: 0,
+    overflowX: 'auto',
+    position: 'relative',
+    zIndex: 30,
   };
 
   return (
@@ -276,7 +279,7 @@ export const Toolbar = () => {
         {showBgPicker && currentBoardId && (
           <div style={{
             position: 'absolute',
-            bottom: 'calc(100% + 10px)',
+            top: 'calc(100% + 8px)',
             left: '50%',
             transform: 'translateX(-50%)',
             backgroundColor: colors.white,
