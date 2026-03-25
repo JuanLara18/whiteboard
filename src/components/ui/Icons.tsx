@@ -62,13 +62,15 @@ export const IconImage = ({ size = 15 }: IconProps) => (
   </svg>
 );
 
-// ── Eraser (stroke eraser) — classic eraser parallelogram shape ───────────────
+// ── Eraser (stroke eraser) — tilted block + band (reads as rubber, not a house) ─
 export const IconEraser = ({ size = 18 }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
-    {/* Eraser body: parallelogram */}
-    <path d="M17 17H6L2.5 13 11 5l6 6Z" stroke="currentColor" {...S} />
-    {/* Inner divider line (highlight band) */}
-    <path d="M5 14L7.5 11.5" stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" />
+    <path
+      d="M4.5 13.5L14 6.5l2 1.5-9.5 8.5-2-1.5z"
+      stroke="currentColor"
+      {...S}
+    />
+    <path d="M7 12.5l5-3.5" stroke="currentColor" {...S} />
   </svg>
 );
 
