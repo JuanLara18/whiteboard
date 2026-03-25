@@ -1,45 +1,106 @@
 // src/components/ui/Toolbar.tsx
-import React, { useState } from 'react';
-import type { ChangeEvent } from 'react';
+import React, { type ChangeEvent } from 'react';
 import { useBoardStore } from '../../store/boardStore';
-import { colors, spacing, shadows, layout } from '../../styles/design-system';
-import { StyledButton, StyledBadge, StyledText } from './StyledComponents';
+import { colors, spacing, shadows, layout, components } from '../../styles/design-system';
+import {
+  IconSelect, IconHand, IconNote, IconPencil, IconTrash,
+  IconDownload, IconUpload, IconImage,
+} from './Icons';
 import { triggerExportPNG, exportBoardAsJSON, importBoardFromJSON } from '../../utils/exportUtils';
 
-const tools = [
-  { id: 'select',      label: 'Select',    shortcut: 'S', title: 'Select & move elements (S)' },
-  { id: 'pan',         label: 'Pan',       shortcut: 'P', title: 'Pan the canvas (P)' },
-  { id: 'sticky-note', label: 'Note',      shortcut: 'N', title: 'Add sticky note (N)' },
-  { id: 'pen',         label: 'Draw',      shortcut: 'D', title: 'Freehand drawing (D)' },
+// ── Preset pen colors ─────────────────────────────────────────────────────────
+const PEN_PRESETS = [
+  { color: '#111827', label: 'Black' },
+  { color: '#DC2626', label: 'Red' },
+  { color: '#2563EB', label: 'Blue' },
 ];
 
+// ── Tool definitions ──────────────────────────────────────────────────────────
+type ToolId = 'select' | 'pan' | 'sticky-note' | 'pen';
+const TOOLS: { id: ToolId; label: string; shortcut: string; Icon: React.FC }[] = [
+  { id: 'select',      label: 'Select',     shortcut: 'S', Icon: () => <IconSelect /> },
+  { id: 'pan',         label: 'Pan',        shortcut: 'P', Icon: () => <IconHand /> },
+  { id: 'sticky-note', label: 'Sticky Note',shortcut: 'N', Icon: () => <IconNote /> },
+  { id: 'pen',         label: 'Draw',       shortcut: 'D', Icon: () => <IconPencil /> },
+];
+
+// ── Toolbar icon button ───────────────────────────────────────────────────────
+interface ToolBtnProps {
+  active?: boolean;
+  onClick: () => void;
+  title: string;
+  disabled?: boolean;
+  danger?: boolean;
+  children: React.ReactNode;
+}
+const ToolBtn: React.FC<ToolBtnProps> = ({ active, onClick, title, disabled, danger, children }) => {
+  const [hover, setHover] = React.useState(false);
+
+  const base = components.button.base;
+  const bg = disabled
+    ? 'transparent'
+    : danger
+      ? hover ? colors.error[700] : colors.error[600]
+      : active
+        ? colors.gray[900]
+        : hover
+          ? colors.gray[100]
+          : 'transparent';
+
+  const col = disabled
+    ? colors.gray[300]
+    : danger
+      ? colors.white
+      : active
+        ? colors.white
+        : hover
+          ? colors.gray[700]
+          : colors.gray[500];
+
+  return (
+    <button
+      title={title}
+      onClick={onClick}
+      disabled={disabled}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        ...base,
+        width: 34,
+        height: 34,
+        padding: 0,
+        borderRadius: 7,
+        backgroundColor: bg,
+        color: col,
+        cursor: disabled ? 'not-allowed' : 'pointer',
+        transition: '120ms',
+        flexShrink: 0,
+      }}
+    >
+      {children}
+    </button>
+  );
+};
+
+// ── Divider ───────────────────────────────────────────────────────────────────
+const Div = () => (
+  <div style={{ width: 1, height: 20, backgroundColor: colors.gray[200], flexShrink: 0 }} />
+);
+
+// ── Toolbar ───────────────────────────────────────────────────────────────────
 export const Toolbar = () => {
   const {
-    currentTool,
-    setCurrentTool,
-    currentBoardId,
-    boards,
-    selectedElements,
-    deleteSelectedElements,
-    clearSelection,
-    zoomLevel,
-    zoomIn,
-    zoomOut,
-    resetZoom,
-    penColor,
-    penWidth,
-    setPenColor,
-    setPenWidth,
-    smoothing,
-    setSmoothing,
-    simplify,
-    setSimplify,
+    currentTool, setCurrentTool,
+    currentBoardId, boards,
+    selectedElements, deleteSelectedElements, clearSelection,
+    zoomLevel, zoomIn, zoomOut, resetZoom,
+    penColor, penWidth, setPenColor, setPenWidth,
+    smoothing, setSmoothing, simplify, setSimplify,
     createBoard,
   } = useBoardStore();
 
-  const [importError, setImportError] = useState<string | null>(null);
-
-  const activeBoardData = boards.find((board: any) => board.id === currentBoardId);
+  const [importError, setImportError] = React.useState<string | null>(null);
+  const activeBoardData = boards.find((b: any) => b.id === currentBoardId);
 
   const handleDeleteSelected = () => {
     if (!currentBoardId) return;
@@ -47,30 +108,16 @@ export const Toolbar = () => {
     clearSelection();
   };
 
-  const handleExportPNG = () => {
-    if (!currentBoardId) return;
-    triggerExportPNG();
-  };
-
-  const handleExportJSON = () => {
-    if (!activeBoardData) return;
-    exportBoardAsJSON(activeBoardData);
-  };
-
   const handleImportJSON = async () => {
     setImportError(null);
     try {
       const board = await importBoardFromJSON();
       createBoard(board.name, board.template);
-      // The new board is created empty by createBoard; we need to populate it
-      // We'll add elements after creation via store update
-      // For simplicity, use updateBoard to set elements on the newly created board
-      // The createBoard sets currentBoardId to the new board, so we look it up after a tick
       setTimeout(() => {
         const state = useBoardStore.getState();
-        const newBoard = state.boards.find((b: any) => b.name === board.name);
-        if (newBoard && board.elements.length > 0) {
-          state.updateBoard(newBoard.id, { elements: board.elements });
+        const latest = state.boards.find((b: any) => b.name === board.name && b.elements.length === 0);
+        if (latest && board.elements.length > 0) {
+          state.updateBoard(latest.id, { elements: board.elements });
         }
       }, 0);
     } catch (err: any) {
@@ -80,182 +127,217 @@ export const Toolbar = () => {
   };
 
   const toolbarStyle: React.CSSProperties = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    height: layout.toolbar.height,
-    padding: `0 ${spacing[4]}`,
-    backgroundColor: layout.toolbar.backgroundColor,
-    borderBottomWidth: '1px',
-    borderBottomStyle: 'solid',
-    borderBottomColor: layout.toolbar.borderColor,
-    boxShadow: shadows.sm,
-    gap: spacing[3],
-    flexShrink: 0,
-  };
-
-  const dividerStyle = {
-    width: '1px',
-    height: '24px',
-    backgroundColor: colors.gray[300],
-    flexShrink: 0,
+    display:          'flex',
+    alignItems:       'center',
+    gap:              spacing[2],
+    height:           layout.toolbar.height,
+    padding:          `0 ${spacing[3]}`,
+    backgroundColor:  layout.toolbar.backgroundColor,
+    borderBottom:     `1px solid ${layout.toolbar.borderColor}`,
+    boxShadow:        shadows.sm,
+    flexShrink:       0,
+    overflowX:        'auto',
+    overflowY:        'hidden',
   };
 
   return (
     <div style={toolbarStyle}>
-      {/* Tools */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], flexShrink: 0 }}>
-        <div style={{ display: 'flex', gap: spacing[1] }}>
-          {tools.map((tool) => (
-            <StyledButton
-              key={tool.id}
-              variant={currentTool === tool.id ? 'primary' : 'secondary'}
-              size="sm"
-              title={tool.title}
-              onClick={() => setCurrentTool(tool.id)}
-            >
-              {tool.label}
-              <span style={{
-                marginLeft: spacing[1],
-                fontSize: '10px',
-                opacity: 0.6,
-                fontWeight: 'normal',
-                letterSpacing: '0.05em',
-              }}>
-                {tool.shortcut}
-              </span>
-            </StyledButton>
-          ))}
-        </div>
-
-        <div style={dividerStyle} />
-
-        <StyledButton
-          variant="danger"
-          size="sm"
-          title="Delete selected elements (Delete / Backspace)"
-          disabled={selectedElements.length === 0}
-          onClick={handleDeleteSelected}
-        >
-          Delete {selectedElements.length > 0 && `(${selectedElements.length})`}
-        </StyledButton>
+      {/* ── Tools ── */}
+      <div style={{ display: 'flex', gap: spacing[0.5] }}>
+        {TOOLS.map(({ id, label, shortcut, Icon }) => (
+          <ToolBtn
+            key={id}
+            active={currentTool === id}
+            onClick={() => setCurrentTool(id)}
+            title={`${label}  [${shortcut}]`}
+          >
+            <Icon />
+          </ToolBtn>
+        ))}
       </div>
 
-      {/* Board info */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[3], flexShrink: 0 }}>
+      <Div />
+
+      {/* ── Delete ── */}
+      <ToolBtn
+        danger
+        disabled={selectedElements.length === 0}
+        onClick={handleDeleteSelected}
+        title={`Delete selected  [Delete]`}
+      >
+        <IconTrash />
+      </ToolBtn>
+
+      <Div />
+
+      {/* ── Board name ── */}
+      <div style={{ flex: 1, overflow: 'hidden', textAlign: 'center', minWidth: 0 }}>
         {activeBoardData ? (
-          <>
-            <StyledText size="base" weight="semibold" color={colors.gray[800]}>
-              {activeBoardData.name}
-            </StyledText>
-            <StyledBadge variant="default">
-              {activeBoardData.elements.length} {activeBoardData.elements.length === 1 ? 'element' : 'elements'}
-            </StyledBadge>
-          </>
-        ) : (
-          <StyledText size="sm" color={colors.gray[400]}>No board selected</StyledText>
-        )}
-        {selectedElements.length > 0 && (
-          <StyledBadge variant="success">
-            {selectedElements.length} selected
-          </StyledBadge>
-        )}
+          <span style={{
+            fontSize:     '13px',
+            fontWeight:   600,
+            color:        colors.gray[700],
+            overflow:     'hidden',
+            textOverflow: 'ellipsis',
+            whiteSpace:   'nowrap',
+            display:      'block',
+          }}>
+            {activeBoardData.name}
+          </span>
+        ) : null}
       </div>
 
-      {/* Pen settings — only when pen tool is active */}
+      <Div />
+
+      {/* ── Pen settings (only when pen active) ── */}
       {currentTool === 'pen' && (
-        <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], flexShrink: 0 }}>
-          <div style={dividerStyle} />
-          <input
-            type="color"
-            value={penColor}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setPenColor(e.target.value)}
-            title="Pen color"
-            style={{ width: 28, height: 24, border: `1px solid ${colors.gray[300]}`, borderRadius: 6, padding: 0, cursor: 'pointer' }}
-          />
-          <StyledText size="xs" color={colors.gray[600]}>Width</StyledText>
-          <input
-            type="range"
-            min={1}
-            max={12}
-            value={penWidth}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setPenWidth(parseInt(e.target.value))}
-            title="Pen width"
-            style={{ width: 72 }}
-          />
-          <StyledText size="xs" color={colors.gray[700]} style={{ minWidth: 28 }}>{penWidth}px</StyledText>
-          <div style={dividerStyle} />
-          <StyledText size="xs" color={colors.gray[600]}>Smooth</StyledText>
-          <input
-            type="range"
-            min={1}
-            max={15}
-            value={smoothing}
-            onChange={(e: ChangeEvent<HTMLInputElement>) => setSmoothing(parseInt(e.target.value))}
-            title="Stroke smoothing"
-            style={{ width: 60 }}
-          />
-          <label style={{ display: 'inline-flex', alignItems: 'center', gap: spacing[1], cursor: 'pointer' }}>
+        <>
+          {/* Color presets */}
+          <div style={{ display: 'flex', gap: spacing[1], alignItems: 'center' }}>
+            {PEN_PRESETS.map(({ color, label }) => (
+              <button
+                key={color}
+                title={label}
+                onClick={() => setPenColor(color)}
+                style={{
+                  width:        20,
+                  height:       20,
+                  borderRadius: '50%',
+                  backgroundColor: color,
+                  border:       penColor === color ? `2px solid ${colors.primary[500]}` : `2px solid transparent`,
+                  outline:      penColor === color ? `2px solid ${colors.primary[200]}` : 'none',
+                  cursor:       'pointer',
+                  padding:      0,
+                  transition:   '100ms',
+                  flexShrink:   0,
+                }}
+              />
+            ))}
+            {/* Custom color */}
             <input
-              type="checkbox"
-              checked={simplify}
-              onChange={(e: ChangeEvent<HTMLInputElement>) => setSimplify(e.target.checked)}
-              title="Simplify strokes (reduces point count)"
+              type="color"
+              value={penColor}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPenColor(e.target.value)}
+              title="Custom color"
+              style={{
+                width:        20,
+                height:       20,
+                borderRadius: '50%',
+                border:       `2px solid ${colors.gray[300]}`,
+                padding:      0,
+                cursor:       'pointer',
+                background:   'none',
+                flexShrink:   0,
+              }}
             />
-            <StyledText as="span" size="xs" color={colors.gray[600]}>Simplify</StyledText>
-          </label>
-        </div>
+          </div>
+
+          <Div />
+
+          {/* Width */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing[1.5] }}>
+            <span style={{ fontSize: '11px', color: colors.gray[400], whiteSpace: 'nowrap' }}>Width</span>
+            <input
+              type="range"
+              min={1}
+              max={12}
+              value={penWidth}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setPenWidth(parseInt(e.target.value))}
+              title="Stroke width"
+              style={{ width: 64, accentColor: colors.primary[500] }}
+            />
+            <span style={{ fontSize: '11px', color: colors.gray[500], minWidth: 22 }}>{penWidth}px</span>
+          </div>
+
+          <Div />
+
+          {/* Smoothing + Simplify */}
+          <div style={{ display: 'flex', alignItems: 'center', gap: spacing[1.5] }}>
+            <span style={{ fontSize: '11px', color: colors.gray[400], whiteSpace: 'nowrap' }}>Smooth</span>
+            <input
+              type="range"
+              min={1}
+              max={15}
+              value={smoothing}
+              onChange={(e: ChangeEvent<HTMLInputElement>) => setSmoothing(parseInt(e.target.value))}
+              title="Stroke smoothing"
+              style={{ width: 52, accentColor: colors.primary[500] }}
+            />
+            <label style={{ display: 'inline-flex', alignItems: 'center', gap: spacing[1], cursor: 'pointer' }}>
+              <input
+                type="checkbox"
+                checked={simplify}
+                onChange={(e: ChangeEvent<HTMLInputElement>) => setSimplify(e.target.checked)}
+                title="Reduce points (Simplify)"
+                style={{ accentColor: colors.primary[500] }}
+              />
+              <span style={{ fontSize: '11px', color: colors.gray[400] }}>Simplify</span>
+            </label>
+          </div>
+
+          <Div />
+        </>
       )}
 
-      {/* Zoom + Export */}
-      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2], flexShrink: 0 }}>
-        <StyledButton variant="secondary" size="sm" onClick={zoomOut} title="Zoom out (scroll down)">−</StyledButton>
-        <StyledText
-          size="sm"
-          color={colors.gray[700]}
-          style={{ minWidth: '44px', textAlign: 'center', cursor: 'pointer', userSelect: 'none' }}
+      {/* ── Zoom ── */}
+      <div style={{ display: 'flex', alignItems: 'center', gap: spacing[1] }}>
+        <ToolBtn onClick={zoomOut} title="Zoom out  [Scroll ↓]">
+          <span style={{ fontSize: 16, lineHeight: 1, marginBottom: 1 }}>−</span>
+        </ToolBtn>
+        <button
           onClick={resetZoom}
-          title="Click to reset zoom"
+          title="Reset zoom  [click]"
+          style={{
+            background:   'none',
+            border:       'none',
+            cursor:       'pointer',
+            fontSize:     '12px',
+            fontWeight:   500,
+            color:        colors.gray[500],
+            minWidth:     42,
+            textAlign:    'center',
+            padding:      `${spacing[1]} ${spacing[1.5]}`,
+            borderRadius: 6,
+          }}
         >
           {Math.round(zoomLevel * 100)}%
-        </StyledText>
-        <StyledButton variant="secondary" size="sm" onClick={zoomIn} title="Zoom in (scroll up)">+</StyledButton>
-
-        <div style={dividerStyle} />
-
-        <StyledButton
-          variant="ghost"
-          size="sm"
-          onClick={handleExportPNG}
-          disabled={!currentBoardId}
-          title="Export board as PNG image"
-        >
-          PNG
-        </StyledButton>
-        <StyledButton
-          variant="ghost"
-          size="sm"
-          onClick={handleExportJSON}
-          disabled={!currentBoardId}
-          title="Export board as JSON (for backup or sharing)"
-        >
-          Export
-        </StyledButton>
-        <StyledButton
-          variant="ghost"
-          size="sm"
-          onClick={handleImportJSON}
-          title="Import a board from a JSON file"
-        >
-          Import
-        </StyledButton>
-
-        {importError && (
-          <StyledText size="xs" color={colors.error[600]} style={{ maxWidth: '200px' }}>
-            {importError}
-          </StyledText>
-        )}
+        </button>
+        <ToolBtn onClick={zoomIn} title="Zoom in  [Scroll ↑]">
+          <span style={{ fontSize: 16, lineHeight: 1 }}>+</span>
+        </ToolBtn>
       </div>
+
+      <Div />
+
+      {/* ── Export / Import ── */}
+      <div style={{ display: 'flex', gap: spacing[0.5] }}>
+        <ToolBtn
+          onClick={() => { if (currentBoardId) triggerExportPNG(); }}
+          disabled={!currentBoardId}
+          title="Export as PNG image"
+        >
+          <IconImage />
+        </ToolBtn>
+        <ToolBtn
+          onClick={() => { if (activeBoardData) exportBoardAsJSON(activeBoardData); }}
+          disabled={!currentBoardId}
+          title="Export board as JSON (backup / share)"
+        >
+          <IconDownload />
+        </ToolBtn>
+        <ToolBtn
+          onClick={handleImportJSON}
+          title="Import board from JSON file"
+        >
+          <IconUpload />
+        </ToolBtn>
+      </div>
+
+      {importError && (
+        <span style={{ fontSize: '11px', color: colors.error[600], maxWidth: 160 }}>
+          {importError}
+        </span>
+      )}
     </div>
   );
 };

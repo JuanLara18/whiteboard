@@ -12,160 +12,154 @@ interface StickyNoteProps {
 
 export const StickyNote = ({ note, isSelected, onSelect }: StickyNoteProps) => {
   const { updateElement, currentBoardId } = useBoardStore();
-  const shapeRef = useRef(null as any);
+  const groupRef = useRef(null as any);
   const transformerRef = useRef(null as any);
   const textRef = useRef(null as any);
-  
+
   const [editing, setEditing] = useState(false);
 
-  // Update transformer when selection changes
+  // Wire transformer to the group node when selected
   useEffect(() => {
-    if (isSelected && transformerRef.current && shapeRef.current) {
-      transformerRef.current.nodes([shapeRef.current]);
+    if (isSelected && transformerRef.current && groupRef.current) {
+      transformerRef.current.nodes([groupRef.current]);
       transformerRef.current.getLayer()?.batchDraw();
     }
   }, [isSelected]);
 
   const handleDragEnd = (e: any) => {
     if (!currentBoardId) return;
-    
     updateElement(currentBoardId, note.id, {
-      position: {
-        x: e.target.x(),
-        y: e.target.y(),
-      },
+      position: { x: e.target.x(), y: e.target.y() },
     });
   };
 
   const handleTransformEnd = () => {
-    if (!currentBoardId || !shapeRef.current) return;
-    
-    const node = shapeRef.current;
+    if (!currentBoardId || !groupRef.current) return;
+    const node = groupRef.current;
     const scaleX = node.scaleX();
     const scaleY = node.scaleY();
-    
-    // Reset scale and update size
     node.scaleX(1);
     node.scaleY(1);
-    
     updateElement(currentBoardId, note.id, {
-      position: {
-        x: node.x(),
-        y: node.y(),
-      },
+      position: { x: node.x(), y: node.y() },
       size: {
-        width: Math.max(100, node.width() * scaleX),
-        height: Math.max(80, node.height() * scaleY),
+        width:  Math.max(100, node.width()  * scaleX),
+        height: Math.max(80,  node.height() * scaleY),
       },
     });
   };
 
-  const handleDoubleClick = () => {
-    setEditing(true);
-  };
-
-  const handleTextEdit = () => {
+  // Open an overlay textarea that matches the note's position, size, and zoom level
+  const openEditor = () => {
     if (!currentBoardId) return;
-    
-    // Create a temporary textarea for editing
-    const textPosition = textRef.current?.absolutePosition();
-    if (!textPosition) return;
+    const node = textRef.current;
+    if (!node) return;
 
-    const stage = textRef.current.getStage();
+    const stage    = node.getStage();
+    const scale    = stage.scaleX();           // current zoom
     const stageBox = stage.container().getBoundingClientRect();
-    
+    const absPos   = node.absolutePosition();  // already accounts for stage transform
+
     const textarea = document.createElement('textarea');
     document.body.appendChild(textarea);
 
     textarea.value = note.content;
     textarea.className = 'sticky-note-editor';
-    textarea.style.position = 'absolute';
-    textarea.style.top = (stageBox.top + textPosition.y) + 'px';
-    textarea.style.left = (stageBox.left + textPosition.x) + 'px';
-    textarea.style.width = note.size.width - 20 + 'px';
-    textarea.style.height = note.size.height - 20 + 'px';
-    textarea.style.zIndex = '1000';
+
+    Object.assign(textarea.style, {
+      position:        'fixed',                // use fixed to ignore scroll
+      top:             `${stageBox.top  + absPos.y}px`,
+      left:            `${stageBox.left + absPos.x}px`,
+      width:           `${(note.size.width  - 24) * scale}px`,
+      height:          `${(note.size.height - 24) * scale}px`,
+      fontSize:        `${13 * scale}px`,
+      lineHeight:      '1.5',
+      fontFamily:      designSystem.typography.fonts.sans,
+      padding:         '0',
+      margin:          '0',
+      zIndex:          '9999',
+      background:      note.color,
+      color:           designSystem.colors.gray[800],
+      border:          `2px solid ${designSystem.colors.primary[500]}`,
+      borderRadius:    `${4 * scale}px`,
+      resize:          'none',
+      outline:         'none',
+      boxSizing:       'border-box',
+    });
 
     textarea.focus();
     textarea.select();
 
-    const removeTextarea = () => {
+    const close = () => {
+      if (!document.body.contains(textarea)) return;
       const newContent = textarea.value;
       document.body.removeChild(textarea);
       setEditing(false);
-      
       if (newContent !== note.content) {
-        updateElement(currentBoardId, note.id, {
-          content: newContent,
-        });
+        updateElement(currentBoardId, note.id, { content: newContent });
       }
     };
 
     textarea.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && (e.ctrlKey || e.metaKey)) {
-        removeTextarea();
-      }
-      if (e.key === 'Escape') {
-        removeTextarea();
+      if ((e.key === 'Enter' && (e.ctrlKey || e.metaKey)) || e.key === 'Escape') {
+        close();
       }
     });
-
-    textarea.addEventListener('blur', removeTextarea);
+    textarea.addEventListener('blur', close);
   };
 
   useEffect(() => {
-    if (editing) {
-      handleTextEdit();
-    }
-  }, [editing]);
+    if (editing) openEditor();
+  }, [editing]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  const isSelectTool = useBoardStore.getState().currentTool === 'select';
 
   return (
     <>
       <Group
-        ref={shapeRef}
+        ref={groupRef}
         x={note.position.x}
         y={note.position.y}
-        draggable
+        draggable={isSelectTool}
         onDragEnd={handleDragEnd}
         onClick={onSelect}
         onTap={onSelect}
         onTransformEnd={handleTransformEnd}
-        onDblClick={handleDoubleClick}
-        onDblTap={handleDoubleClick}
+        onDblClick={() => setEditing(true)}
+        onDblTap={() => setEditing(true)}
       >
-        {/* Note background */}
+        {/* Background */}
         <Rect
           width={note.size.width}
           height={note.size.height}
           fill={note.color}
-          stroke={isSelected ? designSystem.colors.primary[500] : 'transparent'}
-          strokeWidth={isSelected ? 2 : 0}
-          shadowColor="rgba(0,0,0,0.15)"
-          shadowBlur={6}
-          shadowOffset={{ x: 2, y: 2 }}
-          shadowOpacity={0.2}
-          cornerRadius={parseInt(designSystem.borderRadius.md)}
+          stroke={isSelected ? designSystem.colors.primary[500] : 'rgba(0,0,0,0.06)'}
+          strokeWidth={isSelected ? 2 : 1}
+          shadowColor="rgba(0,0,0,0.12)"
+          shadowBlur={8}
+          shadowOffset={{ x: 0, y: 2 }}
+          shadowOpacity={1}
+          cornerRadius={6}
         />
-        
-        {/* Note text */}
+        {/* Text */}
         <Text
           ref={textRef}
           x={12}
           y={12}
-          width={note.size.width - 24}
+          width={note.size.width  - 24}
           height={note.size.height - 24}
-          text={note.content}
-          fontSize={parseInt(designSystem.typography.sizes.sm)}
+          text={editing ? '' : note.content}
+          fontSize={13}
           fontFamily={designSystem.typography.fonts.sans}
           fill={designSystem.colors.gray[800]}
           align="left"
           verticalAlign="top"
           wrap="word"
-          lineHeight={designSystem.typography.lineHeights.relaxed}
+          lineHeight={1.5}
         />
       </Group>
-      
-      {/* Transformer for resizing */}
+
+      {/* Resize handles */}
       {isSelected && (
         <Transformer
           ref={transformerRef}
@@ -174,18 +168,14 @@ export const StickyNote = ({ note, isSelected, onSelect }: StickyNoteProps) => {
           borderStroke={designSystem.colors.primary[500]}
           borderStrokeWidth={2}
           anchorStroke={designSystem.colors.primary[500]}
-          anchorStrokeWidth={2}
+          anchorStrokeWidth={1.5}
           anchorFill="white"
           anchorSize={8}
+          anchorCornerRadius={2}
           keepRatio={false}
           boundBoxFunc={(_oldBox: any, newBox: any) => {
-            // Minimum size constraints
-            if (newBox.width < 100) {
-              newBox.width = 100;
-            }
-            if (newBox.height < 80) {
-              newBox.height = 80;
-            }
+            if (newBox.width  < 100) newBox.width  = 100;
+            if (newBox.height < 80)  newBox.height = 80;
             return newBox;
           }}
         />

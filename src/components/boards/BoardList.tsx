@@ -1,271 +1,270 @@
 // src/components/boards/BoardList.tsx
 import React, { useState } from 'react';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
-import { colors, spacing, layout } from '../../styles/design-system';
-import { StyledButton, StyledInput, StyledCard, StyledModal, StyledText, StyledBadge } from '../ui/StyledComponents';
+import { spacing, layout, colors, shadows, borderRadius } from '../../styles/design-system';
+import { StyledModal, StyledInput, StyledButton, StyledText } from '../ui/StyledComponents';
 import { useBoardStore } from '../../store/boardStore';
 import { BOARD_TEMPLATES } from '../../constants/boardTemplates';
 import { TemplatePreview } from './TemplatePreview';
 
+// ── Sidebar-specific tokens ───────────────────────────────────────────────────
+const SB = {
+  bg:            layout.sidebar.backgroundColor,
+  border:        layout.sidebar.borderColor,
+  text:          layout.sidebar.textColor,
+  textMuted:     layout.sidebar.textSecondary,
+  hover:         layout.sidebar.hoverColor,
+  active:        layout.sidebar.activeColor,
+  width:         layout.sidebar.width,
+};
+
+// ── Sidebar button ────────────────────────────────────────────────────────────
+interface SbBtnProps {
+  onClick: (e?: MouseEvent) => void;
+  children: React.ReactNode;
+  variant?: 'primary' | 'ghost' | 'danger';
+  size?: 'sm' | 'xs';
+  title?: string;
+  style?: React.CSSProperties;
+}
+const SbBtn: React.FC<SbBtnProps> = ({ onClick, children, variant = 'ghost', size = 'sm', title, style }) => {
+  const [hover, setHover] = React.useState(false);
+  const isPrimary = variant === 'primary';
+  const isDanger  = variant === 'danger';
+
+  return (
+    <button
+      title={title}
+      onClick={(e) => onClick(e as MouseEvent)}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      style={{
+        display:         'inline-flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        gap:             spacing[1],
+        border:          'none',
+        cursor:          'pointer',
+        borderRadius:    borderRadius.md,
+        fontSize:        size === 'xs' ? '11px' : '12px',
+        fontWeight:      500,
+        padding:         size === 'xs' ? `${spacing[1]} ${spacing[1.5]}` : `${spacing[1.5]} ${spacing[3]}`,
+        transition:      '120ms',
+        whiteSpace:      'nowrap',
+        backgroundColor: isPrimary
+          ? hover ? colors.primary[500] : colors.primary[600]
+          : isDanger
+            ? hover ? colors.error[700] : 'transparent'
+            : hover ? SB.hover : 'transparent',
+        color: isPrimary
+          ? colors.white
+          : isDanger
+            ? hover ? colors.error[200] : colors.error[400]
+            : SB.textMuted,
+        ...style,
+      }}
+    >
+      {children}
+    </button>
+  );
+};
+
+// ── Main BoardList ────────────────────────────────────────────────────────────
 export const BoardList = () => {
-  const { 
-    boards, 
-    currentBoardId, 
-    selectBoard, 
-    createBoard, 
-    deleteBoard, 
-    renameBoard 
-  } = useBoardStore();
-  
-  const [newBoardName, setNewBoardName] = useState('');
-  const [selectedTemplate, setSelectedTemplate] = useState(BOARD_TEMPLATES[0]);
-  const [editingBoard, setEditingBoard] = useState(null as { id: string; name: string } | null);
-  const [deletingBoard, setDeletingBoard] = useState(null as string | null);
-  
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [isEditOpen, setIsEditOpen] = useState(false);
-  const [isDeleteOpen, setIsDeleteOpen] = useState(false);
+  const { boards, currentBoardId, selectBoard, createBoard, deleteBoard, renameBoard } = useBoardStore();
+
+  const [newBoardName,    setNewBoardName]    = useState('');
+  const [selectedTemplate,setSelectedTemplate]= useState(BOARD_TEMPLATES[0]);
+  const [editingBoard,    setEditingBoard]    = useState<{ id: string; name: string } | null>(null);
+  const [deletingBoard,   setDeletingBoard]   = useState<string | null>(null);
+  const [isCreateOpen,    setIsCreateOpen]    = useState(false);
+  const [isEditOpen,      setIsEditOpen]      = useState(false);
+  const [isDeleteOpen,    setIsDeleteOpen]    = useState(false);
 
   const handleCreateBoard = async () => {
-    if (newBoardName.trim()) {
-      await createBoard(newBoardName.trim(), selectedTemplate);
-      setNewBoardName('');
-      setSelectedTemplate(BOARD_TEMPLATES[0]);
-      setIsCreateOpen(false);
-    }
-  };
-
-  const handleEditBoard = (board: { id: string; name: string }) => {
-    setEditingBoard(board);
-    setIsEditOpen(true);
+    if (!newBoardName.trim()) return;
+    await createBoard(newBoardName.trim(), selectedTemplate);
+    setNewBoardName('');
+    setSelectedTemplate(BOARD_TEMPLATES[0]);
+    setIsCreateOpen(false);
   };
 
   const handleSaveEdit = async () => {
-    if (editingBoard && editingBoard.name.trim()) {
-      await renameBoard(editingBoard.id, editingBoard.name.trim());
-      setEditingBoard(null);
-      setIsEditOpen(false);
-    }
-  };
-
-  const handleDeleteBoard = (boardId: string) => {
-    setDeletingBoard(boardId);
-    setIsDeleteOpen(true);
+    if (!editingBoard?.name.trim()) return;
+    await renameBoard(editingBoard.id, editingBoard.name.trim());
+    setEditingBoard(null);
+    setIsEditOpen(false);
   };
 
   const confirmDelete = async () => {
-    if (deletingBoard) {
-      await deleteBoard(deletingBoard);
-      setDeletingBoard(null);
-      setIsDeleteOpen(false);
-    }
+    if (!deletingBoard) return;
+    await deleteBoard(deletingBoard);
+    setDeletingBoard(null);
+    setIsDeleteOpen(false);
   };
 
   const sidebarStyle: React.CSSProperties = {
-    height: '100vh',
-    width: layout.sidebar.width,
-    backgroundColor: layout.sidebar.backgroundColor,
-    borderRightWidth: '1px',
-    borderRightStyle: 'solid',
-    borderRightColor: layout.sidebar.borderColor,
-    padding: spacing[6],
-    overflow: 'auto',
-  };
-
-  const headerStyle = {
-    display: 'flex',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing[6],
-  };
-
-  const emptyStateStyle = {
-    textAlign: 'center' as const,
-    padding: spacing[12],
-    borderWidth: '2px',
-    borderStyle: 'dashed',
-    borderColor: colors.gray[300],
-    borderRadius: '12px',
-    backgroundColor: colors.gray[50],
+    height:          '100vh',
+    width:           SB.width,
+    minWidth:        SB.width,
+    backgroundColor: SB.bg,
+    borderRight:     `1px solid ${SB.border}`,
+    display:         'flex',
+    flexDirection:   'column',
+    overflow:        'hidden',
   };
 
   return (
     <div style={sidebarStyle}>
       {/* Header */}
-      <div style={headerStyle}>
-        <StyledText as="h1" size="xl" weight="bold" color={colors.gray[900]}>
+      <div style={{
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'space-between',
+        padding:         `${spacing[4]} ${spacing[4]}`,
+        borderBottom:    `1px solid ${SB.border}`,
+        flexShrink:      0,
+      }}>
+        <span style={{ fontSize: '13px', fontWeight: 600, color: SB.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>
           Boards
-        </StyledText>
-        <StyledButton
-          variant="primary"
-          size="sm"
-          onClick={() => setIsCreateOpen(true)}
-        >
+        </span>
+        <SbBtn variant="primary" size="sm" onClick={() => setIsCreateOpen(true)} title="Create new board">
           + New
-        </StyledButton>
+        </SbBtn>
       </div>
 
-      {/* Boards list */}
-      <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[3] }}>
+      {/* Board list */}
+      <div style={{ flex: 1, overflowY: 'auto', padding: spacing[2] }}>
         {boards.length === 0 ? (
-          <div style={emptyStateStyle}>
+          <div style={{ padding: `${spacing[8]} ${spacing[3]}`, textAlign: 'center' }}>
             <div style={{
-              width: '48px',
-              height: '48px',
-              backgroundColor: colors.gray[200],
-              borderRadius: '12px',
-              margin: `0 auto ${spacing[4]}`,
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              fontSize: '24px',
+              fontSize: '28px',
+              marginBottom: spacing[3],
+              opacity: 0.4,
             }}>
               📋
             </div>
-            <StyledText size="base" weight="medium" color={colors.gray[700]} style={{ marginBottom: spacing[2] }}>
-              No boards yet
-            </StyledText>
-            <StyledText size="sm" color={colors.gray[500]} style={{ marginBottom: spacing[4] }}>
-              Create your first whiteboard to get started
-            </StyledText>
-            <StyledButton
-              variant="primary"
-              onClick={() => setIsCreateOpen(true)}
-            >
-              Create your first board
-            </StyledButton>
+            <p style={{ fontSize: '12px', color: SB.textMuted, marginBottom: spacing[4], lineHeight: 1.6 }}>
+              No boards yet.<br />Create one to get started.
+            </p>
+            <SbBtn variant="primary" onClick={() => setIsCreateOpen(true)}>
+              + Create board
+            </SbBtn>
           </div>
         ) : (
-          boards.map((board: { id: string; name: string; elements: any[] }) => (
-            <StyledCard
-              key={board.id}
-              interactive
-              hover
-              onClick={() => selectBoard(board.id)}
-              style={{
-                padding: spacing[4],
-                backgroundColor: currentBoardId === board.id ? colors.primary[50] : colors.white,
-                borderColor: currentBoardId === board.id ? colors.primary[200] : colors.gray[200],
-                cursor: 'pointer',
-              }}
-            >
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          boards.map((board: { id: string; name: string; elements: any[] }) => {
+            const isActive = currentBoardId === board.id;
+            return (
+              <div
+                key={board.id}
+                onClick={() => selectBoard(board.id)}
+                style={{
+                  display:         'flex',
+                  alignItems:      'center',
+                  justifyContent:  'space-between',
+                  padding:         `${spacing[2]} ${spacing[3]}`,
+                  borderRadius:    borderRadius.md,
+                  cursor:          'pointer',
+                  marginBottom:    spacing[0.5],
+                  backgroundColor: isActive ? SB.active : 'transparent',
+                  transition:      '100ms',
+                  border:          isActive ? `1px solid ${colors.gray[700]}` : '1px solid transparent',
+                }}
+                onMouseEnter={(e) => {
+                  if (!isActive) (e.currentTarget as HTMLDivElement).style.backgroundColor = SB.hover;
+                }}
+                onMouseLeave={(e) => {
+                  if (!isActive) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
+                }}
+              >
+                {/* Board name */}
                 <div style={{ flex: 1, minWidth: 0 }}>
-                  <StyledText 
-                    size="base" 
-                    weight={currentBoardId === board.id ? 'semibold' : 'medium'}
-                    color={currentBoardId === board.id ? colors.primary[800] : colors.gray[800]}
-                    style={{ marginBottom: spacing[1] }}
-                  >
+                  <p style={{
+                    fontSize:     '13px',
+                    fontWeight:   isActive ? 600 : 400,
+                    color:        isActive ? colors.gray[50] : SB.textMuted,
+                    overflow:     'hidden',
+                    textOverflow: 'ellipsis',
+                    whiteSpace:   'nowrap',
+                    margin:       0,
+                  }}>
                     {board.name}
-                  </StyledText>
-                  <div style={{ display: 'flex', alignItems: 'center', gap: spacing[2] }}>
-                    <StyledBadge variant="default" size="sm">
-                      {board.elements.length} elements
-                    </StyledBadge>
-                    {currentBoardId === board.id && (
-                      <StyledBadge variant="success" size="sm">
-                        Active
-                      </StyledBadge>
-                    )}
-                  </div>
+                  </p>
                 </div>
-                
-                <div style={{ display: 'flex', gap: spacing[1], marginLeft: spacing[2] }}>
-                  <StyledButton
-                    variant="ghost"
+
+                {/* Actions */}
+                <div
+                  style={{ display: 'flex', gap: spacing[0.5], marginLeft: spacing[2], opacity: isActive ? 1 : 0 }}
+                  onMouseEnter={(e) => (e.currentTarget as HTMLDivElement).style.opacity = '1'}
+                  onMouseLeave={(e) => (e.currentTarget as HTMLDivElement).style.opacity = isActive ? '1' : '0'}
+                >
+                  <SbBtn
                     size="xs"
-                    onClick={(e: MouseEvent) => {
-                      e.stopPropagation();
-                      handleEditBoard(board);
-                    }}
+                    onClick={(e?: MouseEvent) => { e?.stopPropagation(); setEditingBoard(board); setIsEditOpen(true); }}
                     title="Rename board"
                   >
-                    Rename
-                  </StyledButton>
-                  <StyledButton
-                    variant="ghost"
+                    ✎
+                  </SbBtn>
+                  <SbBtn
                     size="xs"
-                    onClick={(e: MouseEvent) => {
-                      e.stopPropagation();
-                      handleDeleteBoard(board.id);
-                    }}
+                    variant="danger"
+                    onClick={(e?: MouseEvent) => { e?.stopPropagation(); setDeletingBoard(board.id); setIsDeleteOpen(true); }}
                     title="Delete board"
-                    style={{ color: colors.error[600] }}
                   >
-                    Delete
-                  </StyledButton>
+                    ✕
+                  </SbBtn>
                 </div>
               </div>
-            </StyledCard>
-          ))
+            );
+          })
         )}
       </div>
 
-      {/* Create board modal */}
+      {/* Footer hint */}
+      <div style={{
+        padding:      `${spacing[3]} ${spacing[4]}`,
+        borderTop:    `1px solid ${SB.border}`,
+        flexShrink:   0,
+      }}>
+        <p style={{ fontSize: '11px', color: colors.gray[600], lineHeight: 1.5, margin: 0 }}>
+          Space + drag to pan · Scroll to zoom
+        </p>
+      </div>
+
+      {/* ── Modals (rendered in light style on white backdrop) ── */}
+
+      {/* Create */}
       <StyledModal
         isOpen={isCreateOpen}
         onClose={() => setIsCreateOpen(false)}
-        title="Create New Board"
+        title="New board"
         footer={
-          <div style={{ display: 'flex', gap: spacing[3] }}>
-            <StyledButton variant="ghost" onClick={() => setIsCreateOpen(false)}>
-              Cancel
-            </StyledButton>
-            <StyledButton 
-              variant="primary" 
-              onClick={handleCreateBoard} 
-              disabled={!newBoardName.trim()}
-            >
-              Create Board
+          <div style={{ display: 'flex', gap: spacing[2] }}>
+            <StyledButton variant="ghost" onClick={() => setIsCreateOpen(false)}>Cancel</StyledButton>
+            <StyledButton variant="primary" onClick={handleCreateBoard} disabled={!newBoardName.trim()}>
+              Create
             </StyledButton>
           </div>
         }
       >
         <div style={{ display: 'flex', flexDirection: 'column', gap: spacing[4] }}>
           <StyledInput
-            label="Board Name"
-            placeholder="Enter board name..."
+            label="Board name"
+            placeholder="Untitled board"
             value={newBoardName}
             onChange={(e: ChangeEvent<HTMLInputElement>) => setNewBoardName(e.target.value)}
             onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleCreateBoard()}
             autoFocus
           />
-          
           <div>
-            <StyledText 
-              size="sm" 
-              weight="medium" 
-              color={colors.gray[700]} 
-              style={{ marginBottom: spacing[3] }}
-            >
-              Choose a template:
-            </StyledText>
-            
-            <div 
-              style={{ 
-                display: 'grid', 
-                gridTemplateColumns: 'repeat(auto-fit, minmax(80px, 1fr))', 
-                gap: spacing[3],
-                maxHeight: '200px',
-                overflowY: 'auto',
-              }}
-            >
-              {BOARD_TEMPLATES.map((template) => (
-                <div key={template.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: spacing[2] }}>
-                  <TemplatePreview
-                    template={template}
-                    size="medium"
-                    selected={selectedTemplate.id === template.id}
-                    onClick={() => setSelectedTemplate(template)}
-                  />
-                  <StyledText 
-                    size="xs" 
-                    color={colors.gray[600]}
-                    style={{ textAlign: 'center', maxWidth: '80px' }}
-                  >
-                    {template.name}
-                  </StyledText>
+            <p style={{ fontSize: '12px', fontWeight: 500, color: colors.gray[600], marginBottom: spacing[3] }}>
+              Background template
+            </p>
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(72px,1fr))', gap: spacing[2] }}>
+              {BOARD_TEMPLATES.map((t) => (
+                <div key={t.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: spacing[1.5] }}>
+                  <TemplatePreview template={t} size="medium" selected={selectedTemplate.id === t.id} onClick={() => setSelectedTemplate(t)} />
+                  <span style={{ fontSize: '10px', color: colors.gray[500], textAlign: 'center' }}>{t.name}</span>
                 </div>
               ))}
             </div>
@@ -273,69 +272,47 @@ export const BoardList = () => {
         </div>
       </StyledModal>
 
-      {/* Edit board modal */}
+      {/* Rename */}
       <StyledModal
         isOpen={isEditOpen}
         onClose={() => setIsEditOpen(false)}
-        title="Rename Board"
+        title="Rename board"
         footer={
-          <div style={{ display: 'flex', gap: spacing[3] }}>
-            <StyledButton variant="ghost" onClick={() => setIsEditOpen(false)}>
-              Cancel
-            </StyledButton>
-            <StyledButton 
-              variant="primary" 
-              onClick={handleSaveEdit} 
-              disabled={!editingBoard || !editingBoard.name.trim()}
-            >
-              Save Changes
+          <div style={{ display: 'flex', gap: spacing[2] }}>
+            <StyledButton variant="ghost" onClick={() => setIsEditOpen(false)}>Cancel</StyledButton>
+            <StyledButton variant="primary" onClick={handleSaveEdit} disabled={!editingBoard?.name.trim()}>
+              Save
             </StyledButton>
           </div>
         }
       >
         <StyledInput
-          label="Board Name"
-          placeholder="Enter board name..."
-          value={editingBoard?.name || ''}
-          onChange={(e: ChangeEvent<HTMLInputElement>) => setEditingBoard((prev: { id: string; name: string } | null) => 
-            prev ? { ...prev, name: e.target.value } : null
-          )}
+          label="Board name"
+          placeholder="Untitled board"
+          value={editingBoard?.name ?? ''}
+          onChange={(e: ChangeEvent<HTMLInputElement>) =>
+            setEditingBoard(prev => prev ? { ...prev, name: e.target.value } : null)
+          }
           onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleSaveEdit()}
           autoFocus
         />
       </StyledModal>
 
-      {/* Delete confirmation modal */}
+      {/* Delete confirm */}
       <StyledModal
         isOpen={isDeleteOpen}
         onClose={() => setIsDeleteOpen(false)}
-        title="Delete Board"
+        title="Delete board?"
         footer={
-          <div style={{ display: 'flex', gap: spacing[3] }}>
-            <StyledButton variant="ghost" onClick={() => setIsDeleteOpen(false)}>
-              Cancel
-            </StyledButton>
-            <StyledButton variant="danger" onClick={confirmDelete}>
-              Delete Board
-            </StyledButton>
+          <div style={{ display: 'flex', gap: spacing[2] }}>
+            <StyledButton variant="ghost" onClick={() => setIsDeleteOpen(false)}>Cancel</StyledButton>
+            <StyledButton variant="danger" onClick={confirmDelete}>Delete</StyledButton>
           </div>
         }
       >
-        <div style={{ 
-          padding: spacing[4], 
-          backgroundColor: colors.warning[50], 
-          borderRadius: '8px',
-          borderWidth: '1px',
-          borderStyle: 'solid',
-          borderColor: colors.warning[200],
-        }}>
-          <StyledText weight="medium" color={colors.warning[800]} style={{ marginBottom: spacing[2] }}>
-            ⚠️ This action cannot be undone
-          </StyledText>
-          <StyledText size="sm" color={colors.warning[700]}>
-            All elements in this board will be permanently deleted. Are you sure you want to continue?
-          </StyledText>
-        </div>
+        <p style={{ fontSize: '14px', color: colors.gray[600], lineHeight: 1.6, margin: 0 }}>
+          This will permanently delete the board and all its content. This action cannot be undone.
+        </p>
       </StyledModal>
     </div>
   );
