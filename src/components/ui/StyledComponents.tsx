@@ -1,5 +1,6 @@
 // React import not required due to automatic JSX runtime
 import { colors, components, spacing, typography, borderRadius, transitions } from '../../styles/design-system';
+import { IconX } from './Icons';
 
 // Styled Button Component
 interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement> {
@@ -214,7 +215,7 @@ export const StyledModal: React.FC<ModalProps> = ({
                 style={{ padding: spacing[1] }}
                 aria-label="Close modal"
               >
-                ✕
+                <IconX size={18} />
               </StyledButton>
             </div>
           </div>

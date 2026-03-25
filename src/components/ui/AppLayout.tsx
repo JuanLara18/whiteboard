@@ -4,6 +4,7 @@ import { colors, layout, spacing } from '../../styles/design-system';
 import { StyledButton } from './StyledComponents';
 import { BoardList } from '../boards/BoardList';
 import { Toolbar } from './Toolbar';
+import { IconGrid } from './Icons';
 import { Canvas } from '../canvas/Canvas';
 import { useBoardStore } from '../../store/boardStore';
 
@@ -100,11 +101,11 @@ export const AppLayout = () => {
                 display:      'flex',
                 alignItems:   'center',
                 justifyContent:'center',
-                fontSize:     '36px',
                 marginBottom: spacing[6],
                 boxShadow:    `0 8px 24px rgba(99,102,241,0.3)`,
+                color:        colors.white,
               }}>
-                🎨
+                <IconGrid size={40} />
               </div>
               <h2 style={{
                 fontSize:     '22px',
@@ -126,7 +127,7 @@ export const AppLayout = () => {
                 Everything saves automatically to your browser.
               </p>
               <StyledButton variant="primary" onClick={() => createBoard('Untitled')}>
-                + Create your first board
+                Create your first board
               </StyledButton>
               <p style={{
                 marginTop:  spacing[5],

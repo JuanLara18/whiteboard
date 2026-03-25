@@ -104,6 +104,13 @@ export const IconRedo = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+// ── Close / dismiss (modal, compact actions) ────────────────────────────────
+export const IconX = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+    <path d="M5 5l10 10M15 5L5 15" stroke="currentColor" {...S} />
+  </svg>
+);
+
 // ── Background / Template picker ─────────────────────────────────────────────
 export const IconGrid = ({ size = 16 }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 20 20" fill="none">

@@ -1,6 +1,6 @@
 <div align="center">
 
-# 🎨 Whiteboard
+# Whiteboard
 
 **A lightweight, local-first whiteboard that lives in your browser.**  
 Sketch ideas, add sticky notes, draw freely — everything saves automatically. No account needed.
@@ -15,7 +15,7 @@ Sketch ideas, add sticky notes, draw freely — everything saves automatically. 
 
 ---
 
-## ✨ Features
+## Features
 
 - **Multiple boards** — create as many as you need, each with its own name and template
 - **Freehand drawing** — pen tool with smoothing and stroke simplification
@@ -29,7 +29,7 @@ Sketch ideas, add sticky notes, draw freely — everything saves automatically. 
 
 ---
 
-## 🚀 Get Started in 3 Steps
+## Get started in 3 steps
 
 ```bash
 # 1. Clone the repo
@@ -49,7 +49,7 @@ Open [http://localhost:5173](http://localhost:5173) — that's it. No database, 
 
 ---
 
-## ⌨️ Keyboard Shortcuts
+## Keyboard shortcuts
 
 | Key | Action |
 |-----|--------|
@@ -63,7 +63,7 @@ Open [http://localhost:5173](http://localhost:5173) — that's it. No database, 
 
 ---
 
-## 🖼️ Screenshot
+## Screenshot
 
 <!-- Add a screenshot here after running the app -->
 > _Run the app and take a screenshot to add here!_  
@@ -71,7 +71,7 @@ Open [http://localhost:5173](http://localhost:5173) — that's it. No database, 
 
 ---
 
-## 📦 Export & Backup
+## Export and backup
 
 **Export as PNG** — click the `PNG` button in the toolbar to download the current board as an image.
 
@@ -81,7 +81,7 @@ Open [http://localhost:5173](http://localhost:5173) — that's it. No database, 
 
 ---
 
-## 🛠️ Build for Production
+## Build for production
 
 ```bash
 npm run build
@@ -90,7 +90,7 @@ npm run build
 
 ---
 
-## 🤝 Contributing
+## Contributing
 
 Contributions are welcome! See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup and guidelines.
 
@@ -98,6 +98,6 @@ For architecture details and design decisions, see [docs/ARCHITECTURE.md](docs/A
 
 ---
 
-## 📄 License
+## License
 
 MIT © [JuanLara18](https://github.com/JuanLara18) — see [LICENSE](LICENSE)

@@ -6,6 +6,7 @@ import { StyledModal, StyledInput, StyledButton } from '../ui/StyledComponents';
 import { useBoardStore } from '../../store/boardStore';
 import { BOARD_TEMPLATES } from '../../constants/boardTemplates';
 import { TemplatePreview } from './TemplatePreview';
+import { IconGrid, IconPencil, IconX } from '../ui/Icons';
 
 // ── Sidebar-specific tokens ───────────────────────────────────────────────────
 const SB = {
@@ -129,7 +130,7 @@ export const BoardList = () => {
           Boards
         </span>
         <SbBtn variant="primary" size="sm" onClick={() => setIsCreateOpen(true)} title="Create new board">
-          + New
+          New
         </SbBtn>
       </div>
 
@@ -138,17 +139,19 @@ export const BoardList = () => {
         {boards.length === 0 ? (
           <div style={{ padding: `${spacing[8]} ${spacing[3]}`, textAlign: 'center' }}>
             <div style={{
-              fontSize: '28px',
               marginBottom: spacing[3],
-              opacity: 0.4,
+              opacity: 0.45,
+              color: SB.textMuted,
+              display: 'flex',
+              justifyContent: 'center',
             }}>
-              📋
+              <IconGrid size={36} />
             </div>
             <p style={{ fontSize: '12px', color: SB.textMuted, marginBottom: spacing[4], lineHeight: 1.6 }}>
               No boards yet.<br />Create one to get started.
             </p>
             <SbBtn variant="primary" onClick={() => setIsCreateOpen(true)}>
-              + Create board
+              Create board
             </SbBtn>
           </div>
         ) : (
@@ -203,7 +206,7 @@ export const BoardList = () => {
                     onClick={(e?: MouseEvent) => { e?.stopPropagation(); setEditingBoard(board); setIsEditOpen(true); }}
                     title="Rename board"
                   >
-                    ✎
+                    <IconPencil size={14} />
                   </SbBtn>
                   <SbBtn
                     size="xs"
@@ -211,7 +214,7 @@ export const BoardList = () => {
                     onClick={(e?: MouseEvent) => { e?.stopPropagation(); setDeletingBoard(board.id); setIsDeleteOpen(true); }}
                     title="Delete board"
                   >
-                    ✕
+                    <IconX size={14} />
                   </SbBtn>
                 </div>
               </div>
