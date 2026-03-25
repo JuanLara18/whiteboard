@@ -1,5 +1,5 @@
 // src/components/boards/BoardList.tsx
-import React, { useState, useEffect, useMemo, useCallback } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import type { ChangeEvent, DragEvent, KeyboardEvent, MouseEvent } from 'react';
 import { spacing, layout, colors, borderRadius } from '../../styles/design-system';
 import { StyledModal, StyledInput, StyledButton } from '../ui/StyledComponents';
@@ -21,10 +21,13 @@ const SB = {
   active:        layout.sidebar.activeColor,
 };
 
-const SIDEBAR_EXPANDED_PX = 220;
+const SIDEBAR_DEFAULT_W   = 220;
 const SIDEBAR_COLLAPSED_PX = 52;
+const SIDEBAR_MIN_W       = 168;
+const SIDEBAR_MAX_W       = 440;
 
 const LS_SIDEBAR_COLLAPSED = 'whiteboard-sidebar-collapsed';
+const LS_SIDEBAR_WIDTH     = 'whiteboard-sidebar-width';
 
 /** HTML5 drag payload (custom MIME + plain text fallback) */
 const DND_BOARD = 'application/x-whiteboard-board-id';
@@ -102,6 +105,9 @@ export const BoardList = () => {
   const [isEditOpen,       setIsEditOpen]       = useState(false);
   const [isDeleteOpen,     setIsDeleteOpen]     = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [sidebarWidthExpanded, setSidebarWidthExpanded] = useState(SIDEBAR_DEFAULT_W);
+  const [isResizingSidebar, setIsResizingSidebar] = useState(false);
+  const resizeRef = useRef({ startX: 0, startW: SIDEBAR_DEFAULT_W });
 
   const [folderExpanded, setFolderExpanded] = useState<Record<string, boolean>>({});
   const [newFolderName,  setNewFolderName]  = useState('');
@@ -127,6 +133,8 @@ export const BoardList = () => {
   useEffect(() => {
     try {
       if (localStorage.getItem(LS_SIDEBAR_COLLAPSED) === '1') setSidebarCollapsed(true);
+      const w = parseInt(localStorage.getItem(LS_SIDEBAR_WIDTH) || '', 10);
+      if (!Number.isNaN(w) && w >= SIDEBAR_MIN_W && w <= SIDEBAR_MAX_W) setSidebarWidthExpanded(w);
     } catch { /* private mode */ }
   }, []);
 
@@ -136,7 +144,35 @@ export const BoardList = () => {
     } catch { /* ignore */ }
   }, [sidebarCollapsed]);
 
-  const sidebarWidthPx = sidebarCollapsed ? SIDEBAR_COLLAPSED_PX : SIDEBAR_EXPANDED_PX;
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_SIDEBAR_WIDTH, String(sidebarWidthExpanded));
+    } catch { /* ignore */ }
+  }, [sidebarWidthExpanded]);
+
+  const sidebarWidthPx = sidebarCollapsed ? SIDEBAR_COLLAPSED_PX : sidebarWidthExpanded;
+
+  const onSidebarResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault();
+    resizeRef.current = { startX: e.clientX, startW: sidebarWidthExpanded };
+    setIsResizingSidebar(true);
+    const onMove = (ev: MouseEvent) => {
+      const dx = ev.clientX - resizeRef.current.startX;
+      const next = Math.min(SIDEBAR_MAX_W, Math.max(SIDEBAR_MIN_W, resizeRef.current.startW + dx));
+      setSidebarWidthExpanded(next);
+    };
+    const onUp = () => {
+      setIsResizingSidebar(false);
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+      document.body.style.cursor = '';
+      document.body.style.userSelect = '';
+    };
+    document.body.style.cursor = 'col-resize';
+    document.body.style.userSelect = 'none';
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [sidebarWidthExpanded]);
 
   const boardsAtRoot = useMemo(
     () => boards.filter((b) => !(b.folderId ?? null)),
@@ -249,17 +285,24 @@ export const BoardList = () => {
     setIsFolderDeleteOpen(false);
   };
 
+  const outerSidebarStyle: React.CSSProperties = {
+    position:     'relative',
+    flexShrink:   0,
+    height:       '100vh',
+    width:        sidebarWidthPx,
+    minWidth:     sidebarWidthPx,
+    transition:   isResizingSidebar || sidebarCollapsed ? undefined : 'width 160ms ease, min-width 160ms ease',
+  };
+
   const sidebarStyle: React.CSSProperties = {
-    height:          '100vh',
-    width:           `${sidebarWidthPx}px`,
-    minWidth:        `${sidebarWidthPx}px`,
+    height:          '100%',
+    width:           '100%',
+    boxSizing:       'border-box',
     backgroundColor: SB.bg,
     borderRight:     `1px solid ${SB.border}`,
     display:         'flex',
     flexDirection:   'column',
     overflow:        'hidden',
-    flexShrink:      0,
-    transition:      'width 200ms ease, min-width 200ms ease',
   };
 
   const collapseBtnStyle = (hover: boolean): React.CSSProperties => ({
@@ -329,7 +372,7 @@ export const BoardList = () => {
           onDragStart={(e) => handleDragStartBoard(e, board.id)}
           onDragEnd={endDrag}
           onClick={(e) => e.stopPropagation()}
-          title="Drag to move to a folder"
+          title="Drag ··· to move"
           style={{
             display:        'flex',
             alignItems:     'center',
@@ -387,6 +430,7 @@ export const BoardList = () => {
   const showDragHint = boards.length > 0;
 
   return (
+    <div style={outerSidebarStyle}>
     <div style={sidebarStyle} onDragEnd={endDrag}>
       {sidebarCollapsed ? (
         <div style={{
@@ -431,7 +475,7 @@ export const BoardList = () => {
           }}>
             Boards
           </span>
-          <SbBtn size="sm" onClick={() => setIsFolderCreateOpen(true)} title="Add empty folder">
+          <SbBtn size="sm" onClick={() => setIsFolderCreateOpen(true)} title="Empty folder">
             <IconFolder size={15} />
           </SbBtn>
           <SbBtn variant="primary" size="sm" onClick={openCreateBoardModal} title="Create new board">
@@ -451,7 +495,7 @@ export const BoardList = () => {
             color: SB.textMuted,
             lineHeight: 1.5,
           }}>
-            No boards yet
+            No boards
           </p>
         ) : (
           <>
@@ -481,12 +525,15 @@ export const BoardList = () => {
                 )}
                 {boardsAtRoot.length === 0 && foldersSorted.length > 0 && (
                   <p style={{
-                    fontSize: 11,
+                    fontSize: 10,
                     color: colors.gray[600],
-                    margin: `${spacing[1]} ${spacing[2]}`,
-                    lineHeight: 1.45,
+                    margin: `${spacing[1]} ${spacing[1]}`,
+                    lineHeight: 1.35,
+                    whiteSpace: 'nowrap' as const,
+                    overflow: 'hidden',
+                    textOverflow: 'ellipsis',
                   }}>
-                    Drop here to take a board out of a folder
+                    Drop here → General
                   </p>
                 )}
                 {boardsAtRoot.map(renderBoardRow)}
@@ -564,8 +611,14 @@ export const BoardList = () => {
                   </div>
                   {open && inner.map(renderBoardRow)}
                   {open && inner.length === 0 && (
-                    <p style={{ fontSize: 11, color: colors.gray[600], margin: `${spacing[1]} ${spacing[2]}`, lineHeight: 1.45 }}>
-                      Drop boards here
+                    <p style={{
+                      fontSize: 10,
+                      color: colors.gray[600],
+                      margin: `${spacing[1]} ${spacing[1]}`,
+                      lineHeight: 1.35,
+                      whiteSpace: 'nowrap' as const,
+                    }}>
+                      Drop here
                     </p>
                   )}
                 </div>
@@ -582,8 +635,17 @@ export const BoardList = () => {
                   textAlign:   'center',
                 }}
               >
-                <p style={{ fontSize: 11, fontWeight: 500, color: colors.gray[400], margin: 0, lineHeight: 1.5 }}>
-                  Drop a board here to create a new folder and move it inside
+                <p style={{
+                  fontSize: 10,
+                  fontWeight: 500,
+                  color: colors.gray[400],
+                  margin: 0,
+                  lineHeight: 1.35,
+                  whiteSpace: 'nowrap' as const,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                }}>
+                  Drop → new folder
                 </p>
               </div>
             )}
@@ -598,9 +660,18 @@ export const BoardList = () => {
         borderTop:    `1px solid ${SB.border}`,
         flexShrink:   0,
       }}>
-        <p style={{ fontSize: '11px', color: colors.gray[600], lineHeight: 1.5, margin: 0 }}>
-          {showDragHint ? 'Drag ··· on a board to move it · ' : ''}
-          Space + drag to pan · Scroll to zoom
+        <p style={{
+          fontSize: '10px',
+          color: colors.gray[600],
+          lineHeight: 1.35,
+          margin: 0,
+          whiteSpace: 'nowrap' as const,
+          overflow: 'hidden',
+          textOverflow: 'ellipsis',
+        }}
+        title={showDragHint ? '··· drag to organize · Space+drag pan · wheel zoom' : 'Space+drag pan · wheel zoom'}
+        >
+          {showDragHint ? '··· organize · Space pan · wheel zoom' : 'Space pan · wheel zoom'}
         </p>
       </div>
       )}
@@ -628,8 +699,8 @@ export const BoardList = () => {
             onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleCreateBoard()}
             autoFocus
           />
-          <p style={{ fontSize: 12, color: colors.gray[500], margin: 0, lineHeight: 1.5 }}>
-            New boards start in General. Drag them by the handle into a folder, or onto the dashed area below the list to create a folder.
+          <p style={{ fontSize: 11, color: colors.gray[500], margin: 0, lineHeight: 1.45 }}>
+            In General first. ··· into a folder; bottom dashed strip = new folder.
           </p>
           <div>
             <p style={{ fontSize: '12px', fontWeight: 500, color: colors.gray[600], marginBottom: spacing[3] }}>
@@ -712,8 +783,8 @@ export const BoardList = () => {
           onKeyDown={(e: KeyboardEvent<HTMLInputElement>) => e.key === 'Enter' && handleCreateFolder()}
           autoFocus
         />
-        <p style={{ fontSize: 12, color: colors.gray[500], marginTop: spacing[3], marginBottom: 0, lineHeight: 1.5 }}>
-          Drag boards into this folder from General using the ··· handle.
+        <p style={{ fontSize: 11, color: colors.gray[500], marginTop: spacing[3], marginBottom: 0, lineHeight: 1.45 }}>
+          Drag ··· from General into this folder.
         </p>
       </StyledModal>
 
@@ -756,9 +827,33 @@ export const BoardList = () => {
         }
       >
         <p style={{ fontSize: '14px', color: colors.gray[600], lineHeight: 1.6, margin: 0 }}>
-          Boards inside this folder will move to General. The folder will be removed.
+          Boards return to General; folder is removed.
         </p>
       </StyledModal>
+    </div>
+
+    {!sidebarCollapsed && (
+      <div
+        role="separator"
+        aria-orientation="vertical"
+        aria-label="Resize sidebar"
+        title="Drag to resize"
+        onMouseDown={onSidebarResizeStart}
+        style={{
+          position:        'absolute',
+          top:             0,
+          right:           0,
+          width:           6,
+          marginRight:     -3,
+          height:          '100%',
+          cursor:          'col-resize',
+          zIndex:          6,
+          backgroundColor: 'transparent',
+        }}
+        onMouseEnter={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'rgba(255,255,255,0.08)'; }}
+        onMouseLeave={(e) => { (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent'; }}
+      />
+    )}
     </div>
   );
 };

@@ -108,10 +108,10 @@ export const AppLayout = () => {
               }}>
                 {boards.length === 0 ? (
                   <>
-                    Use <span style={{ fontWeight: 600, color: colors.gray[700] }}>New</span> in the sidebar to create a board.
+                    Sidebar → <span style={{ fontWeight: 600, color: colors.gray[700] }}>New</span> for a board.
                   </>
                 ) : (
-                  <>Select a board in the sidebar to open it here.</>
+                  <>Open a board from the sidebar.</>
                 )}
               </p>
             </div>
