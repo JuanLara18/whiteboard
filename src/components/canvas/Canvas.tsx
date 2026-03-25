@@ -13,35 +13,37 @@ interface CanvasProps {
 }
 
 export const Canvas = ({ board }: CanvasProps) => {
-  const stageRef = useRef(null as any);
+  const stageRef     = useRef(null as any);
   const containerRef = useRef(null as any);
-  const [scale, setScale] = useState(1);
-  const [position, setPosition] = useState({ x: 0, y: 0 });
+
+  const [scale,     setScale]     = useState(1);
+  const [position,  setPosition]  = useState({ x: 0, y: 0 });
   const [stageSize, setStageSize] = useState({ width: 0, height: 0 });
   const [isDrawing, setIsDrawing] = useState(false);
   const [currentPoints, setCurrentPoints] = useState([] as number[]);
 
+  // ── Temporary pan via Spacebar ──────────────────────────────────────────────
+  const [isSpaceDown, setIsSpaceDown] = useState(false);
+
+  // ── Middle-mouse pan ────────────────────────────────────────────────────────
+  const [isMidPanning, setIsMidPanning] = useState(false);
+  const midPanOrigin = useRef({ mouseX: 0, mouseY: 0, stageX: 0, stageY: 0 });
+
   const {
-    selectedElements,
-    setSelectedElements,
-    clearSelection,
+    selectedElements, setSelectedElements, clearSelection,
     currentTool,
     addElement,
-    penColor,
-    penWidth,
-    smoothing,
-    simplify,
-    setZoom,
-    zoomLevel,
+    penColor, penWidth, smoothing, simplify,
+    setZoom, zoomLevel,
   } = useBoardStore();
 
-  // Resize observer — keep stage filling its container
+  // ── Resize observer ─────────────────────────────────────────────────────────
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
     const update = () => {
-      const rect = el.getBoundingClientRect();
-      setStageSize({ width: Math.max(0, rect.width), height: Math.max(0, rect.height) });
+      const r = el.getBoundingClientRect();
+      setStageSize({ width: Math.max(0, r.width), height: Math.max(0, r.height) });
     };
     update();
     if (typeof ResizeObserver !== 'undefined') {
@@ -53,32 +55,50 @@ export const Canvas = ({ board }: CanvasProps) => {
     return () => window.removeEventListener('resize', update);
   }, []);
 
-  // Keep local scale in sync with store zoom (e.g. toolbar buttons)
-  useEffect(() => {
-    setScale(zoomLevel);
-  }, [zoomLevel]);
+  // Keep local scale synced when toolbar changes zoom level
+  useEffect(() => { setScale(zoomLevel); }, [zoomLevel]);
 
-  // Register PNG export so Toolbar can trigger it
+  // ── Register PNG export callback ────────────────────────────────────────────
   useEffect(() => {
     registerExportPNG(() => {
       const stage = stageRef.current;
       if (!stage) return;
-      const dataURL = stage.toDataURL({ pixelRatio: 2 });
+      const url = stage.toDataURL({ pixelRatio: 2 });
       const a = document.createElement('a');
-      a.href = dataURL;
+      a.href = url;
       a.download = `${board.name.replace(/[^a-z0-9]/gi, '_')}.png`;
       a.click();
     });
   }, [board.name]);
 
-  // Wheel zoom — zoom toward pointer
+  // ── Spacebar global listeners ───────────────────────────────────────────────
+  useEffect(() => {
+    const onDown = (e: KeyboardEvent) => {
+      if (e.code !== 'Space') return;
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+      e.preventDefault();
+      setIsSpaceDown(true);
+    };
+    const onUp = (e: KeyboardEvent) => {
+      if (e.code === 'Space') setIsSpaceDown(false);
+    };
+    window.addEventListener('keydown', onDown);
+    window.addEventListener('keyup',   onUp);
+    return () => {
+      window.removeEventListener('keydown', onDown);
+      window.removeEventListener('keyup',   onUp);
+    };
+  }, []);
+
+  // ── Wheel zoom ──────────────────────────────────────────────────────────────
   const handleWheel = useCallback((e: any) => {
     e.evt.preventDefault();
     const stage = stageRef.current;
     if (!stage) return;
-    const oldScale = scale;
     const pointer = stage.getPointerPosition();
     if (!pointer) return;
+    const oldScale = scale;
     const mousePointTo = {
       x: (pointer.x - position.x) / oldScale,
       y: (pointer.y - position.y) / oldScale,
@@ -96,6 +116,85 @@ export const Canvas = ({ board }: CanvasProps) => {
     setPosition({ x: e.target.x(), y: e.target.y() });
   }, []);
 
+  // ── Pointer helpers ─────────────────────────────────────────────────────────
+  const toCanvasPoint = (pos: { x: number; y: number }) => ({
+    x: (pos.x - position.x) / scale,
+    y: (pos.y - position.y) / scale,
+  });
+
+  // ── Mouse / touch handlers ──────────────────────────────────────────────────
+  const handleMouseDown = useCallback((e: any) => {
+    // Middle mouse button — start panning
+    if (e.evt.button === 1) {
+      e.evt.preventDefault();
+      const stage = stageRef.current;
+      const pos   = stage?.position() ?? { x: 0, y: 0 };
+      midPanOrigin.current = {
+        mouseX: e.evt.clientX,
+        mouseY: e.evt.clientY,
+        stageX: pos.x,
+        stageY: pos.y,
+      };
+      setIsMidPanning(true);
+      return;
+    }
+    if (currentTool !== 'pen') return;
+    const pointer = stageRef.current?.getPointerPosition();
+    if (!pointer) return;
+    const p = toCanvasPoint(pointer);
+    setIsDrawing(true);
+    setCurrentPoints([p.x, p.y]);
+  }, [currentTool, position, scale]);
+
+  const handleMouseMove = useCallback((e: any) => {
+    // Middle mouse pan
+    if (isMidPanning) {
+      const dx = e.evt.clientX - midPanOrigin.current.mouseX;
+      const dy = e.evt.clientY - midPanOrigin.current.mouseY;
+      const newX = midPanOrigin.current.stageX + dx;
+      const newY = midPanOrigin.current.stageY + dy;
+      setPosition({ x: newX, y: newY });
+      stageRef.current?.position({ x: newX, y: newY });
+      stageRef.current?.batchDraw();
+      return;
+    }
+    if (!isDrawing || currentTool !== 'pen') return;
+    const pointer = stageRef.current?.getPointerPosition();
+    if (!pointer) return;
+    const p = toCanvasPoint(pointer);
+    setCurrentPoints((prev: number[]) => [...prev, p.x, p.y]);
+  }, [isMidPanning, isDrawing, currentTool, position, scale]);
+
+  const handleMouseUp = useCallback((e: any) => {
+    if (e?.evt?.button === 1 || isMidPanning) {
+      setIsMidPanning(false);
+      return;
+    }
+    if (!isDrawing || currentTool !== 'pen') return;
+    setIsDrawing(false);
+    if (currentPoints.length < 4) { setCurrentPoints([]); return; }
+    const smoothed = smoothing > 1 ? smoothMovingAverage(currentPoints, smoothing) : currentPoints;
+    const finalPoints = simplify ? simplifyRDP(smoothed, Math.max(1, Math.round(penWidth))) : smoothed;
+    const newDrawing: BoardElement = {
+      id:          `draw_${Date.now()}`,
+      type:        'drawing',
+      tool:        'pen',
+      points:      finalPoints,
+      strokeWidth: penWidth,
+      stroke:      penColor,
+      zIndex:      Date.now(),
+    } as any;
+    addElement(board.id, newDrawing);
+    setCurrentPoints([]);
+  }, [isMidPanning, isDrawing, currentTool, currentPoints, addElement, board.id, penColor, penWidth, smoothing, simplify]);
+
+  // Safety: release mid-pan if mouse leaves document
+  useEffect(() => {
+    const onGlobalUp = (e: MouseEvent) => { if (e.button === 1) setIsMidPanning(false); };
+    document.addEventListener('mouseup', onGlobalUp);
+    return () => document.removeEventListener('mouseup', onGlobalUp);
+  }, []);
+
   const handleStageClick = useCallback((e: any) => {
     if (e.target !== e.target.getStage()) return;
     if (currentTool === 'pen') return;
@@ -109,16 +208,16 @@ export const Canvas = ({ board }: CanvasProps) => {
         designSystem.colors.accent.blue,
       ];
       const newNote: BoardElement = {
-        id: `sticky_${Date.now()}`,
-        type: 'sticky-note',
+        id:      `sticky_${Date.now()}`,
+        type:    'sticky-note',
         content: 'New Note',
         position: {
           x: (pointer.x - position.x) / scale,
           y: (pointer.y - position.y) / scale,
         },
-        size: { width: 200, height: 150 },
-        color: noteColors[Math.floor(Math.random() * noteColors.length)],
-        zIndex: Date.now(),
+        size:    { width: 200, height: 150 },
+        color:   noteColors[Math.floor(Math.random() * noteColors.length)],
+        zIndex:  Date.now(),
       };
       addElement(board.id, newNote);
     } else {
@@ -126,75 +225,40 @@ export const Canvas = ({ board }: CanvasProps) => {
     }
   }, [currentTool, position, scale, board.id, addElement, clearSelection]);
 
-  // Drawing helpers
-  const toCanvasPoint = (pos: { x: number; y: number }) => ({
-    x: (pos.x - position.x) / scale,
-    y: (pos.y - position.y) / scale,
-  });
-
-  const handleMouseDown = useCallback(() => {
-    if (currentTool !== 'pen') return;
-    const pointer = stageRef.current?.getPointerPosition();
-    if (!pointer) return;
-    const p = toCanvasPoint(pointer);
-    setIsDrawing(true);
-    setCurrentPoints([p.x, p.y]);
-  }, [currentTool, position, scale]);
-
-  const handleMouseMove = useCallback(() => {
-    if (!isDrawing || currentTool !== 'pen') return;
-    const pointer = stageRef.current?.getPointerPosition();
-    if (!pointer) return;
-    const p = toCanvasPoint(pointer);
-    setCurrentPoints((prev: number[]) => [...prev, p.x, p.y]);
-  }, [isDrawing, currentTool, position, scale]);
-
-  const handleMouseUp = useCallback(() => {
-    if (!isDrawing || currentTool !== 'pen') return;
-    setIsDrawing(false);
-    if (currentPoints.length < 4) {
-      setCurrentPoints([]);
-      return;
-    }
-    const smoothed = smoothing > 1 ? smoothMovingAverage(currentPoints, smoothing) : currentPoints;
-    const finalPoints = simplify
-      ? simplifyRDP(smoothed, Math.max(1, Math.round(penWidth)))
-      : smoothed;
-
-    const newDrawing: BoardElement = {
-      id: `draw_${Date.now()}`,
-      type: 'drawing',
-      tool: 'pen',
-      points: finalPoints,
-      strokeWidth: penWidth,
-      stroke: penColor,
-      zIndex: Date.now(),
-    } as any;
-    addElement(board.id, newDrawing);
-    setCurrentPoints([]);
-  }, [isDrawing, currentTool, currentPoints, addElement, board.id, penColor, penWidth, smoothing, simplify]);
-
+  // ── Derived ─────────────────────────────────────────────────────────────────
   const stickyNotes = board.elements.filter(el => el.type === 'sticky-note') as any[];
-  const drawings = board.elements.filter(el => el.type === 'drawing') as any[];
+  const drawings    = board.elements.filter(el => el.type === 'drawing')     as any[];
 
-  const canvasContainerStyle: React.CSSProperties = {
-    width: '100%',
-    height: '100%',
-    borderRadius: designSystem.borderRadius.md,
-    overflow: 'hidden',
-    position: 'relative',
-    ...getCanvasBackgroundStyle(board.template),
-    cursor: currentTool === 'pen' ? 'crosshair' : currentTool === 'pan' ? 'grab' : 'default',
-  };
+  const isPanMode = currentTool === 'select' || currentTool === 'pan' || isSpaceDown;
+  const cursor    = isMidPanning || (isSpaceDown && isPanMode)
+    ? 'grabbing'
+    : isSpaceDown
+      ? 'grab'
+      : currentTool === 'pen'
+        ? 'crosshair'
+        : currentTool === 'pan'
+          ? 'grab'
+          : 'default';
 
   return (
-    <div ref={containerRef} style={canvasContainerStyle} className="canvas-container">
+    <div
+      ref={containerRef}
+      className="canvas-container"
+      style={{
+        width:    '100%',
+        height:   '100%',
+        overflow: 'hidden',
+        position: 'relative',
+        cursor,
+        ...getCanvasBackgroundStyle(board.template),
+      }}
+    >
       <Stage
         ref={stageRef}
         width={stageSize.width}
         height={stageSize.height}
         onWheel={handleWheel}
-        draggable={(currentTool === 'select' || currentTool === 'pan') && !isDrawing}
+        draggable={isPanMode && !isDrawing && !isMidPanning}
         onDragEnd={handleStageDragEnd}
         onClick={handleStageClick}
         scaleX={scale}
@@ -211,7 +275,7 @@ export const Canvas = ({ board }: CanvasProps) => {
         <Layer>
           <CanvasBackground
             template={board.template}
-            width={stageSize.width / scale}
+            width={stageSize.width  / scale}
             height={stageSize.height / scale}
           />
           {drawings.map((d) => (
@@ -242,9 +306,7 @@ export const Canvas = ({ board }: CanvasProps) => {
               <StickyNote
                 note={note}
                 isSelected={selectedElements.includes(note.id)}
-                onSelect={() => {
-                  setSelectedElements(selectedElements.includes(note.id) ? [] : [note.id]);
-                }}
+                onSelect={() => setSelectedElements(selectedElements.includes(note.id) ? [] : [note.id])}
               />
             </Fragment>
           ))}
