@@ -191,7 +191,7 @@ export const BoardList = () => {
     e.preventDefault();
     resizeRef.current = { startX: e.clientX, startW: sidebarWidthExpanded };
     setIsResizingSidebar(true);
-    const onMove = (ev: MouseEvent) => {
+    const onMove = (ev: globalThis.MouseEvent) => {
       const dx = ev.clientX - resizeRef.current.startX;
       const next = Math.min(SIDEBAR_MAX_W, Math.max(SIDEBAR_MIN_W, resizeRef.current.startW + dx));
       setSidebarWidthExpanded(next);
@@ -210,12 +210,12 @@ export const BoardList = () => {
   }, [sidebarWidthExpanded]);
 
   const boardsAtRoot = useMemo(
-    () => boards.filter((b) => !(b.folderId ?? null)),
+    () => boards.filter((b: Board) => !(b.folderId ?? null)),
     [boards],
   );
 
   const boardsInFolder = (fid: string) =>
-    boards.filter((b) => (b.folderId ?? null) === fid);
+    boards.filter((b: Board) => (b.folderId ?? null) === fid);
 
   const endDrag = useCallback(() => {
     setDraggingBoardId(null);
@@ -262,7 +262,7 @@ export const BoardList = () => {
     const boardId = readBoardIdFromDrag(e);
     if (boardId) {
       createFolderAndMoveBoard(boardId);
-      const fid = useBoardStore.getState().boards.find((b) => b.id === boardId)?.folderId ?? null;
+      const fid = useBoardStore.getState().boards.find((b: Board) => b.id === boardId)?.folderId ?? null;
       if (fid) setFolderExpanded((p) => ({ ...p, [fid]: true }));
     }
     endDrag();

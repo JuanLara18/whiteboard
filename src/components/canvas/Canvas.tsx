@@ -1,8 +1,10 @@
 // src/components/canvas/Canvas.tsx
-import { useRef, useState, useEffect, useCallback, Fragment } from 'react';
+import { useRef, useState, useEffect, useCallback, useMemo, Fragment } from 'react';
 import { Stage, Layer, Line, Rect } from 'react-konva';
-import { useBoardStore, Board, BoardElement } from '../../store/boardStore';
+import { useBoardStore, Board, BoardElement, type ImageElement } from '../../store/boardStore';
 import { StickyNote } from '../notes/StickyNote';
+import { PlacedImage } from './PlacedImage';
+import { getImageFileFromPasteEvent, prepareImageForBoard } from '../../utils/imageClipboard';
 import { designSystem } from '../../styles/design-system';
 import { CanvasBackground, getCanvasBackgroundStyle } from './CanvasBackground';
 import { simplifyRDP, smoothMovingAverage } from '../../utils/path';
@@ -90,6 +92,48 @@ export const Canvas = ({ board }: CanvasProps) => {
   }, []);
 
   useEffect(() => { setScale(zoomLevel); }, [zoomLevel]);
+
+  // Paste images from clipboard (Ctrl+V) — ignore inputs / sticky editor
+  const pasteCtxRef = useRef({
+    stageSize: { width: 0, height: 0 },
+    position:  { x: 0, y: 0 },
+    scale:     1,
+    boardId:   board.id,
+  });
+  pasteCtxRef.current = { stageSize, position, scale, boardId: board.id };
+
+  useEffect(() => {
+    const onPaste = async (e: ClipboardEvent) => {
+      const t = e.target as HTMLElement;
+      if (t.closest('input, textarea, [contenteditable="true"]')) return;
+
+      const file = getImageFileFromPasteEvent(e);
+      if (!file) return;
+
+      e.preventDefault();
+      const prepared = await prepareImageForBoard(file);
+      if (!prepared) return;
+
+      const { stageSize: ss, position: pos, scale: sc, boardId } = pasteCtxRef.current;
+      if (ss.width < 20 || ss.height < 20) return;
+
+      const cx = (ss.width / 2 - pos.x) / sc - prepared.width / 2;
+      const cy = (ss.height / 2 - pos.y) / sc - prepared.height / 2;
+
+      const imgEl: ImageElement = {
+        id:        `img_${Date.now()}`,
+        type:      'image',
+        src:       prepared.dataUrl,
+        position:  { x: cx, y: cy },
+        size:      { width: prepared.width, height: prepared.height },
+        zIndex:    Date.now(),
+      };
+      useBoardStore.getState().addElement(boardId, imgEl);
+    };
+
+    window.addEventListener('paste', onPaste);
+    return () => window.removeEventListener('paste', onPaste);
+  }, []);
 
   // ── PNG export ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -280,6 +324,7 @@ export const Canvas = ({ board }: CanvasProps) => {
         .filter((el: BoardElement) => {
           if (el.type === 'drawing')     return strokeInRect(el.points, x, y, w, h);
           if (el.type === 'sticky-note') return noteInRect(el.position.x, el.position.y, el.size.width, el.size.height, x, y, w, h);
+          if (el.type === 'image')       return noteInRect(el.position.x, el.position.y, el.size.width, el.size.height, x, y, w, h);
           return false;
         })
         .map((el: BoardElement) => el.id);
@@ -331,8 +376,10 @@ export const Canvas = ({ board }: CanvasProps) => {
   }, [board.id, deleteElement]);
 
   // ── Derived ─────────────────────────────────────────────────────────────────
-  const stickyNotes = board.elements.filter(el => el.type === 'sticky-note') as any[];
-  const drawings    = board.elements.filter(el => el.type === 'drawing')     as any[];
+  const sortedElements = useMemo(
+    () => [...board.elements].sort((a, b) => (a.zIndex ?? 0) - (b.zIndex ?? 0)),
+    [board.elements],
+  );
 
   const activePanning = isMidPanning || isPanning;
   const cursor =
@@ -385,22 +432,56 @@ export const Canvas = ({ board }: CanvasProps) => {
             viewY={viewY}
           />
 
-          {/* Saved drawings */}
-          {drawings.map((d) => (
-            <Line
-              key={d.id}
-              points={d.points}
-              stroke={currentTool === 'eraser-stroke' ? `${d.stroke}99` : d.stroke}
-              strokeWidth={d.strokeWidth}
-              tension={0.4}
-              lineCap="round"
-              lineJoin="round"
-              bezier={false}
-              hitStrokeWidth={currentTool === 'eraser-stroke' ? Math.max(24, d.strokeWidth * 4) : d.strokeWidth}
-              onClick={currentTool === 'eraser-stroke' ? () => handleEraseStroke(d.id) : undefined}
-              onTap={currentTool === 'eraser-stroke'   ? () => handleEraseStroke(d.id) : undefined}
-            />
-          ))}
+          {sortedElements.map((el) => {
+            if (el.type === 'drawing') {
+              const d = el;
+              return (
+                <Line
+                  key={d.id}
+                  points={d.points}
+                  stroke={currentTool === 'eraser-stroke' ? `${d.stroke}99` : d.stroke}
+                  strokeWidth={d.strokeWidth}
+                  tension={0.4}
+                  lineCap="round"
+                  lineJoin="round"
+                  bezier={false}
+                  hitStrokeWidth={currentTool === 'eraser-stroke' ? Math.max(24, d.strokeWidth * 4) : d.strokeWidth}
+                  onClick={currentTool === 'eraser-stroke' ? () => handleEraseStroke(d.id) : undefined}
+                  onTap={currentTool === 'eraser-stroke'   ? () => handleEraseStroke(d.id) : undefined}
+                />
+              );
+            }
+            if (el.type === 'image') {
+              return (
+                <Fragment key={el.id}>
+                  <PlacedImage
+                    image={el}
+                    isSelected={selectedElements.includes(el.id) && currentTool === 'select'}
+                    onSelect={() => {
+                      if (currentTool === 'eraser-stroke') deleteElement(board.id, el.id);
+                      else setSelectedElements(selectedElements.includes(el.id) ? [] : [el.id]);
+                    }}
+                  />
+                </Fragment>
+              );
+            }
+            if (el.type === 'sticky-note') {
+              const note = el;
+              return (
+                <Fragment key={note.id}>
+                  <StickyNote
+                    note={note}
+                    isSelected={selectedElements.includes(note.id) && currentTool === 'select'}
+                    onSelect={() => {
+                      if (currentTool === 'eraser-stroke') deleteElement(board.id, note.id);
+                      else setSelectedElements(selectedElements.includes(note.id) ? [] : [note.id]);
+                    }}
+                  />
+                </Fragment>
+              );
+            }
+            return null;
+          })}
 
           {/* Live drawing preview */}
           {isDrawing && currentTool === 'pen' && currentPoints.length >= 2 && (
@@ -414,23 +495,6 @@ export const Canvas = ({ board }: CanvasProps) => {
               bezier={false}
             />
           )}
-
-          {/* Sticky notes */}
-          {stickyNotes.map((note) => (
-            <Fragment key={note.id}>
-              <StickyNote
-                note={note}
-                isSelected={selectedElements.includes(note.id) && currentTool === 'select'}
-                onSelect={() => {
-                  if (currentTool === 'eraser-stroke') {
-                    deleteElement(board.id, note.id);
-                  } else {
-                    setSelectedElements(selectedElements.includes(note.id) ? [] : [note.id]);
-                  }
-                }}
-              />
-            </Fragment>
-          ))}
 
           {/* Area eraser preview rectangle */}
           {eraseRect && (

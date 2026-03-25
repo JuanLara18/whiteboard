@@ -4,7 +4,8 @@ import { colors, layout, spacing } from '../../styles/design-system';
 import { BoardList } from '../boards/BoardList';
 import { Toolbar } from './Toolbar';
 import { Canvas } from '../canvas/Canvas';
-import { useBoardStore } from '../../store/boardStore';
+import { useBoardStore, type Board, type BoardElement } from '../../store/boardStore';
+import { copyDataUrlToClipboard } from '../../utils/imageClipboard';
 
 export const AppLayout = () => {
   const {
@@ -37,6 +38,15 @@ export const AppLayout = () => {
           redo();
           return;
         }
+        if (e.key.toLowerCase() === 'c' && currentBoardId && selectedElements.length === 1) {
+          const b = boards.find((bd: Board) => bd.id === currentBoardId);
+          const el = b?.elements.find((x: BoardElement) => x.id === selectedElements[0]);
+          if (el?.type === 'image') {
+            e.preventDefault();
+            copyDataUrlToClipboard(el.src).catch(() => { /* clipboard API unavailable */ });
+            return;
+          }
+        }
       }
 
       // Single-key tool shortcuts (no modifier)
@@ -62,7 +72,7 @@ export const AppLayout = () => {
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [currentBoardId, selectedElements, setCurrentTool, deleteSelectedElements, undo, redo]);
+  }, [boards, currentBoardId, selectedElements, setCurrentTool, deleteSelectedElements, undo, redo]);
 
   return (
     <div style={{

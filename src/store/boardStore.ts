@@ -9,10 +9,20 @@ export interface BoardFolder {
   sortOrder: number;
 }
 
+export interface ImageElement {
+  id: string;
+  type: 'image';
+  /** PNG (or other) data URL — persisted in localStorage */
+  src: string;
+  position: { x: number; y: number };
+  size: { width: number; height: number };
+  zIndex: number;
+}
+
 export interface Board {
   id: string;
   name: string;
-  elements: Array<StickyNote | DrawingElement>;
+  elements: Array<StickyNote | DrawingElement | ImageElement>;
   template: BoardTemplate;
   /** null / undefined = not inside a folder */
   folderId?: string | null;
@@ -52,7 +62,7 @@ export interface DrawingElement {
   zIndex: number;
 }
 
-export type BoardElement = StickyNote | DrawingElement;
+export type BoardElement = StickyNote | DrawingElement | ImageElement;
 
 export type ToolId = 'select' | 'pan' | 'sticky-note' | 'pen' | 'eraser-stroke' | 'eraser-area';
 
