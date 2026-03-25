@@ -89,6 +89,41 @@ function readBoardIdFromDrag(e: DragEvent): string | null {
   return v && v.startsWith('board:') ? v.slice('board:'.length) : v || null;
 }
 
+/** Drag handle: higher contrast on dark sidebar (dots read as control, not background noise). */
+const BoardRowGrip: React.FC<{
+  boardId: string;
+  onDragStart: (e: React.DragEvent, id: string) => void;
+  onDragEnd: () => void;
+}> = ({ boardId, onDragStart, onDragEnd }) => {
+  const [hover, setHover] = useState(false);
+  return (
+    <div
+      draggable
+      onDragStart={(e) => onDragStart(e, boardId)}
+      onDragEnd={onDragEnd}
+      onClick={(e) => e.stopPropagation()}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+      title="Drag ··· to move"
+      style={{
+        display:         'flex',
+        alignItems:      'center',
+        justifyContent:  'center',
+        width:           24,
+        height:          26,
+        flexShrink:      0,
+        cursor:          'grab',
+        color:           hover ? colors.gray[400] : colors.gray[500],
+        backgroundColor: hover ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.03)',
+        borderRadius:    borderRadius.md,
+        touchAction:     'none' as const,
+      }}
+    >
+      <IconGripVertical size={14} />
+    </div>
+  );
+};
+
 // ── Main BoardList ────────────────────────────────────────────────────────────
 export const BoardList = () => {
   const {
@@ -367,25 +402,7 @@ export const BoardList = () => {
           if (!isActive) (e.currentTarget as HTMLDivElement).style.backgroundColor = 'transparent';
         }}
       >
-        <div
-          draggable
-          onDragStart={(e) => handleDragStartBoard(e, board.id)}
-          onDragEnd={endDrag}
-          onClick={(e) => e.stopPropagation()}
-          title="Drag ··· to move"
-          style={{
-            display:        'flex',
-            alignItems:     'center',
-            justifyContent: 'center',
-            width:          22,
-            flexShrink:     0,
-            cursor:         'grab',
-            color:          colors.gray[600],
-            touchAction:    'none' as const,
-          }}
-        >
-          <IconGripVertical size={14} />
-        </div>
+        <BoardRowGrip boardId={board.id} onDragStart={handleDragStartBoard} onDragEnd={endDrag} />
 
         <div style={{ flex: 1, minWidth: 0 }}>
           <p style={{
