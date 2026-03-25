@@ -111,6 +111,25 @@ export const IconX = ({ size = 16 }: IconProps) => (
   </svg>
 );
 
+// ── Sidebar collapse / expand ────────────────────────────────────────────────
+export const IconChevronLeft = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+    <path d="M12.5 5L7.5 10l5 5" stroke="currentColor" {...S} />
+  </svg>
+);
+
+export const IconChevronRight = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+    <path d="M7.5 5l5 5-5 5" stroke="currentColor" {...S} />
+  </svg>
+);
+
+export const IconPlus = ({ size = 18 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+    <path d="M10 4v12M4 10h12" stroke="currentColor" {...S} />
+  </svg>
+);
+
 // ── Background / Template picker ─────────────────────────────────────────────
 export const IconGrid = ({ size = 16 }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 20 20" fill="none">

@@ -1,12 +1,12 @@
 // src/components/boards/BoardList.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
 import { spacing, layout, colors, borderRadius } from '../../styles/design-system';
 import { StyledModal, StyledInput, StyledButton } from '../ui/StyledComponents';
 import { useBoardStore } from '../../store/boardStore';
 import { BOARD_TEMPLATES } from '../../constants/boardTemplates';
 import { TemplatePreview } from './TemplatePreview';
-import { IconPencil, IconX } from '../ui/Icons';
+import { IconPencil, IconX, IconChevronLeft, IconChevronRight, IconPlus } from '../ui/Icons';
 
 // ── Sidebar-specific tokens ───────────────────────────────────────────────────
 const SB = {
@@ -18,6 +18,11 @@ const SB = {
   active:        layout.sidebar.activeColor,
   width:         layout.sidebar.width,
 };
+
+const SIDEBAR_EXPANDED_PX = 220;
+const SIDEBAR_COLLAPSED_PX = 52;
+
+const LS_SIDEBAR_COLLAPSED = 'whiteboard-sidebar-collapsed';
 
 // ── Sidebar button ────────────────────────────────────────────────────────────
 interface SbBtnProps {
@@ -81,6 +86,21 @@ export const BoardList = () => {
   const [isCreateOpen,    setIsCreateOpen]    = useState(false);
   const [isEditOpen,      setIsEditOpen]      = useState(false);
   const [isDeleteOpen,    setIsDeleteOpen]    = useState(false);
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(LS_SIDEBAR_COLLAPSED) === '1') setSidebarCollapsed(true);
+    } catch { /* private mode */ }
+  }, []);
+
+  useEffect(() => {
+    try {
+      localStorage.setItem(LS_SIDEBAR_COLLAPSED, sidebarCollapsed ? '1' : '0');
+    } catch { /* ignore */ }
+  }, [sidebarCollapsed]);
+
+  const sidebarWidthPx = sidebarCollapsed ? SIDEBAR_COLLAPSED_PX : SIDEBAR_EXPANDED_PX;
 
   const handleCreateBoard = async () => {
     if (!newBoardName.trim()) return;
@@ -106,36 +126,105 @@ export const BoardList = () => {
 
   const sidebarStyle: React.CSSProperties = {
     height:          '100vh',
-    width:           SB.width,
-    minWidth:        SB.width,
+    width:           `${sidebarWidthPx}px`,
+    minWidth:        `${sidebarWidthPx}px`,
     backgroundColor: SB.bg,
     borderRight:     `1px solid ${SB.border}`,
     display:         'flex',
     flexDirection:   'column',
     overflow:        'hidden',
+    flexShrink:      0,
+    transition:      'width 200ms ease, min-width 200ms ease',
+  };
+
+  const collapseBtnStyle = (hover: boolean): React.CSSProperties => ({
+    display:         'flex',
+    alignItems:      'center',
+    justifyContent:  'center',
+    width:           32,
+    height:          32,
+    padding:         0,
+    border:          'none',
+    borderRadius:    borderRadius.md,
+    cursor:          'pointer',
+    flexShrink:      0,
+    backgroundColor: hover ? SB.hover : 'transparent',
+    color:           SB.textMuted,
+    transition:      '120ms',
+  });
+
+  const CollapseToggle = () => {
+    const [h, setH] = useState(false);
+    return (
+      <button
+        type="button"
+        aria-expanded={!sidebarCollapsed}
+        aria-label={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        title={sidebarCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
+        onClick={() => setSidebarCollapsed((c) => !c)}
+        onMouseEnter={() => setH(true)}
+        onMouseLeave={() => setH(false)}
+        style={collapseBtnStyle(h)}
+      >
+        {sidebarCollapsed ? <IconChevronRight size={18} /> : <IconChevronLeft size={18} />}
+      </button>
+    );
   };
 
   return (
     <div style={sidebarStyle}>
       {/* Header */}
-      <div style={{
-        display:         'flex',
-        alignItems:      'center',
-        justifyContent:  'space-between',
-        padding:         `${spacing[4]} ${spacing[4]}`,
-        borderBottom:    `1px solid ${SB.border}`,
-        flexShrink:      0,
-      }}>
-        <span style={{ fontSize: '13px', fontWeight: 600, color: SB.textMuted, letterSpacing: '0.06em', textTransform: 'uppercase' as const }}>
-          Boards
-        </span>
-        <SbBtn variant="primary" size="sm" onClick={() => setIsCreateOpen(true)} title="Create new board">
-          New
-        </SbBtn>
-      </div>
+      {sidebarCollapsed ? (
+        <div style={{
+          display:        'flex',
+          flexDirection:  'column',
+          alignItems:     'center',
+          gap:            spacing[2],
+          padding:        `${spacing[2]} ${spacing[1]}`,
+          borderBottom:   `1px solid ${SB.border}`,
+          flexShrink:     0,
+        }}>
+          <CollapseToggle />
+          <SbBtn
+            variant="primary"
+            size="sm"
+            onClick={() => setIsCreateOpen(true)}
+            title="New board"
+            style={{ width: 36, height: 36, padding: 0, minWidth: 36 }}
+          >
+            <IconPlus size={18} />
+          </SbBtn>
+        </div>
+      ) : (
+        <div style={{
+          display:         'flex',
+          alignItems:      'center',
+          gap:             spacing[1],
+          padding:         `${spacing[3]} ${spacing[2]} ${spacing[3]} ${spacing[3]}`,
+          borderBottom:    `1px solid ${SB.border}`,
+          flexShrink:      0,
+        }}>
+          <CollapseToggle />
+          <span style={{
+            flex:           1,
+            minWidth:       0,
+            fontSize:     '13px',
+            fontWeight:   600,
+            color:        SB.textMuted,
+            letterSpacing: '0.06em',
+            textTransform: 'uppercase' as const,
+          }}>
+            Boards
+          </span>
+          <SbBtn variant="primary" size="sm" onClick={() => setIsCreateOpen(true)} title="Create new board">
+            New
+          </SbBtn>
+        </div>
+      )}
 
       {/* Board list */}
-      <div style={{ flex: 1, overflowY: 'auto', padding: spacing[2] }}>
+      {!sidebarCollapsed && (
+      <div className="sidebar-scroll" style={{ flex: 1, overflowY: 'auto', padding: spacing[2] }}>
         {boards.length === 0 ? (
           <p style={{
             padding: `${spacing[6]} ${spacing[3]}`,
@@ -215,8 +304,10 @@ export const BoardList = () => {
           })
         )}
       </div>
+      )}
 
       {/* Footer hint */}
+      {!sidebarCollapsed && (
       <div style={{
         padding:      `${spacing[3]} ${spacing[4]}`,
         borderTop:    `1px solid ${SB.border}`,
@@ -226,6 +317,7 @@ export const BoardList = () => {
           Space + drag to pan · Scroll to zoom
         </p>
       </div>
+      )}
 
       {/* ── Modals (rendered in light style on white backdrop) ── */}
 
