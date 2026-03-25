@@ -1,8 +1,8 @@
 // src/components/boards/BoardList.tsx
 import React, { useState } from 'react';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
-import { spacing, layout, colors, shadows, borderRadius } from '../../styles/design-system';
-import { StyledModal, StyledInput, StyledButton, StyledText } from '../ui/StyledComponents';
+import { spacing, layout, colors, borderRadius } from '../../styles/design-system';
+import { StyledModal, StyledInput, StyledButton } from '../ui/StyledComponents';
 import { useBoardStore } from '../../store/boardStore';
 import { BOARD_TEMPLATES } from '../../constants/boardTemplates';
 import { TemplatePreview } from './TemplatePreview';
@@ -53,13 +53,13 @@ const SbBtn: React.FC<SbBtnProps> = ({ onClick, children, variant = 'ghost', siz
         whiteSpace:      'nowrap',
         backgroundColor: isPrimary
           ? hover ? colors.primary[500] : colors.primary[600]
-          : isDanger
+            : isDanger
             ? hover ? colors.error[700] : 'transparent'
             : hover ? SB.hover : 'transparent',
         color: isPrimary
           ? colors.white
           : isDanger
-            ? hover ? colors.error[200] : colors.error[400]
+            ? hover ? colors.error[200] : colors.error[600]
             : SB.textMuted,
         ...style,
       }}
