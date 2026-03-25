@@ -1,20 +1,59 @@
 // src/components/ui/AppLayout.tsx
-import { useEffect, Fragment } from 'react';
+import { useEffect } from 'react';
 import { colors, layout, spacing } from '../../styles/design-system';
-import { StyledText } from './StyledComponents';
+import { StyledButton, StyledText } from './StyledComponents';
 import { BoardList } from '../boards/BoardList';
 import { Toolbar } from './Toolbar';
 import { Canvas } from '../canvas/Canvas';
 import { useBoardStore } from '../../store/boardStore';
 
 export const AppLayout = () => {
-  const { boards, currentBoardId, loadBoards } = useBoardStore();
-  
-  useEffect(() => {
-    loadBoards();
-  }, [loadBoards]);
+  const {
+    boards,
+    currentBoardId,
+    currentTool,
+    selectedElements,
+    setCurrentTool,
+    deleteSelectedElements,
+    createBoard,
+  } = useBoardStore();
 
   const currentBoard = boards.find((board: any) => board.id === currentBoardId);
+
+  // Global keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement;
+      if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return;
+
+      switch (e.key.toLowerCase()) {
+        case 's':
+          setCurrentTool('select');
+          break;
+        case 'p':
+          setCurrentTool('pan');
+          break;
+        case 'n':
+          setCurrentTool('sticky-note');
+          break;
+        case 'd':
+          setCurrentTool('pen');
+          break;
+        case 'delete':
+        case 'backspace':
+          if (currentBoardId && selectedElements.length > 0) {
+            deleteSelectedElements(currentBoardId);
+          }
+          break;
+        case 'escape':
+          setCurrentTool('select');
+          break;
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [currentBoardId, selectedElements, setCurrentTool, deleteSelectedElements, currentTool]);
 
   const mainLayoutStyle = {
     display: 'flex',
@@ -49,43 +88,39 @@ export const AppLayout = () => {
 
   return (
     <div style={mainLayoutStyle}>
-      {/* Sidebar with boards */}
       <BoardList />
-      
-      {/* Main content area */}
       <div style={contentAreaStyle}>
-        {/* Toolbar */}
         <Toolbar />
-        
-        {/* Canvas area */}
         <div style={canvasAreaStyle}>
           {currentBoard ? (
-            <Fragment key={currentBoard.id}>
-              <Canvas board={currentBoard} />
-            </Fragment>
+            <Canvas key={currentBoard.id} board={currentBoard} />
           ) : (
             <div style={emptyStateStyle}>
               <div style={{
-                width: '80px',
-                height: '80px',
-                backgroundColor: colors.gray[200],
-                borderRadius: '20px',
+                width: '96px',
+                height: '96px',
+                background: 'linear-gradient(135deg, #667eea 0%, #764ba2 100%)',
+                borderRadius: '24px',
                 display: 'flex',
                 alignItems: 'center',
                 justifyContent: 'center',
-                fontSize: '36px',
+                fontSize: '48px',
                 marginBottom: spacing[6],
+                boxShadow: '0 8px 32px rgba(102,126,234,0.3)',
               }}>
                 🎨
               </div>
               <StyledText size="2xl" weight="bold" color={colors.gray[800]} style={{ marginBottom: spacing[3] }}>
                 Welcome to Whiteboard
               </StyledText>
-              <StyledText size="lg" color={colors.gray[600]} style={{ marginBottom: spacing[2] }}>
-                No board selected
+              <StyledText size="lg" color={colors.gray[500]} style={{ marginBottom: spacing[6], maxWidth: '360px' }}>
+                Create boards to sketch ideas, add sticky notes, and draw freely — all saved locally in your browser.
               </StyledText>
-              <StyledText size="base" color={colors.gray[500]}>
-                Create a new board or select an existing one from the sidebar to get started
+              <StyledButton variant="primary" onClick={() => createBoard('My First Board')}>
+                + Create your first board
+              </StyledButton>
+              <StyledText size="xs" color={colors.gray[400]} style={{ marginTop: spacing[4] }}>
+                Or use the sidebar to get started
               </StyledText>
             </div>
           )}

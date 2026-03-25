@@ -1,5 +1,5 @@
 // src/components/boards/BoardList.tsx
-import { useState } from 'react';
+import React, { useState } from 'react';
 import type { ChangeEvent, KeyboardEvent, MouseEvent } from 'react';
 import { colors, spacing, layout } from '../../styles/design-system';
 import { StyledButton, StyledInput, StyledCard, StyledModal, StyledText, StyledBadge } from '../ui/StyledComponents';
@@ -61,7 +61,7 @@ export const BoardList = () => {
     }
   };
 
-  const sidebarStyle = {
+  const sidebarStyle: React.CSSProperties = {
     height: '100vh',
     width: layout.sidebar.width,
     backgroundColor: layout.sidebar.backgroundColor,
@@ -69,7 +69,7 @@ export const BoardList = () => {
     borderRightStyle: 'solid',
     borderRightColor: layout.sidebar.borderColor,
     padding: spacing[6],
-    overflow: 'auto' as const,
+    overflow: 'auto',
   };
 
   const headerStyle = {

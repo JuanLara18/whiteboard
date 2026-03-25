@@ -1,54 +1,102 @@
-# React + TypeScript + Vite
+<div align="center">
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+# 🎨 Whiteboard
 
-Currently, two official plugins are available:
+**A lightweight, local-first whiteboard that lives in your browser.**  
+Sketch ideas, add sticky notes, draw freely — everything saves automatically. No account needed.
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react/README.md) uses [Babel](https://babeljs.io/) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript)](https://www.typescriptlang.org)
+[![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite)](https://vitejs.dev)
 
-## Expanding the ESLint configuration
+</div>
 
-If you are developing a production application, we recommend updating the configuration to enable type-aware lint rules:
+---
 
-```js
-export default tseslint.config({
-  extends: [
-    // Remove ...tseslint.configs.recommended and replace with this
-    ...tseslint.configs.recommendedTypeChecked,
-    // Alternatively, use this for stricter rules
-    ...tseslint.configs.strictTypeChecked,
-    // Optionally, add this for stylistic rules
-    ...tseslint.configs.stylisticTypeChecked,
-  ],
-  languageOptions: {
-    // other options...
-    parserOptions: {
-      project: ['./tsconfig.node.json', './tsconfig.app.json'],
-      tsconfigRootDir: import.meta.dirname,
-    },
-  },
-})
+## ✨ Features
+
+- **Multiple boards** — create as many as you need, each with its own name and template
+- **Freehand drawing** — pen tool with smoothing and stroke simplification
+- **Sticky notes** — drag, resize, and double-click to edit
+- **Background templates** — plain, grid, dot grid, ruled lines
+- **Zoom & pan** — mouse wheel to zoom, drag to pan
+- **Auto-save** — boards persist in your browser's localStorage, no setup required
+- **Export to PNG** — one click to save your board as an image
+- **Export / Import JSON** — back up boards or share them with others
+- **Keyboard shortcuts** — work fast without touching the mouse
+
+---
+
+## 🚀 Get Started in 3 Steps
+
+```bash
+# 1. Clone the repo
+git clone https://github.com/YOUR_USERNAME/whiteboard.git
+cd whiteboard
+
+# 2. Install dependencies
+npm install
+
+# 3. Start the app
+npm run dev
 ```
 
-You can also install [eslint-plugin-react-x](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-x) and [eslint-plugin-react-dom](https://github.com/Rel1cx/eslint-react/tree/main/packages/plugins/eslint-plugin-react-dom) for React-specific lint rules:
+Open [http://localhost:5173](http://localhost:5173) — that's it. No database, no backend, no config.
 
-```js
-// eslint.config.js
-import reactX from 'eslint-plugin-react-x'
-import reactDom from 'eslint-plugin-react-dom'
+> **No Node.js?** Download it at [nodejs.org](https://nodejs.org) (LTS version). It takes 2 minutes.
 
-export default tseslint.config({
-  plugins: {
-    // Add the react-x and react-dom plugins
-    'react-x': reactX,
-    'react-dom': reactDom,
-  },
-  rules: {
-    // other rules...
-    // Enable its recommended typescript rules
-    ...reactX.configs['recommended-typescript'].rules,
-    ...reactDom.configs.recommended.rules,
-  },
-})
+---
+
+## ⌨️ Keyboard Shortcuts
+
+| Key | Action |
+|-----|--------|
+| `S` | Select tool |
+| `P` | Pan tool |
+| `N` | Sticky note tool |
+| `D` | Draw (pen) tool |
+| `Delete` / `Backspace` | Delete selected elements |
+| `Escape` | Switch back to Select tool |
+| Scroll wheel | Zoom in / out |
+
+---
+
+## 🖼️ Screenshot
+
+<!-- Add a screenshot here after running the app -->
+> _Run the app and take a screenshot to add here!_  
+> Replace this section with: `![Whiteboard screenshot](docs/screenshot.png)`
+
+---
+
+## 📦 Export & Backup
+
+**Export as PNG** — click the `PNG` button in the toolbar to download the current board as an image.
+
+**Export as JSON** — click `Export` to save a `.whiteboard.json` file you can share or back up.
+
+**Import JSON** — click `Import` to load a board from a file. It is added as a new board so nothing gets overwritten.
+
+---
+
+## 🛠️ Build for Production
+
+```bash
+npm run build
+# Output goes to dist/ — serve it with any static file server
 ```
+
+---
+
+## 🤝 Contributing
+
+Contributions are welcome! See [docs/CONTRIBUTING.md](docs/CONTRIBUTING.md) for development setup and guidelines.
+
+For architecture details and design decisions, see [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
+---
+
+## 📄 License
+
+MIT © see [LICENSE](LICENSE)

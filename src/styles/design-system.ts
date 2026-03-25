@@ -170,7 +170,7 @@ export const components = {
       border: 'none',
       outline: 'none',
       textDecoration: 'none',
-      userSelect: 'none',
+      userSelect: 'none' as const,
     },
     sizes: {
       xs: { padding: `${spacing[1]} ${spacing[2]}`, fontSize: typography.sizes.xs },
@@ -191,7 +191,7 @@ export const components = {
         backgroundColor: colors.white,
         color: colors.gray[700],
         borderWidth: '1px',
-        borderStyle: 'solid',
+        borderStyle: 'solid' as const,
         borderColor: colors.gray[300],
         '&:hover': { backgroundColor: colors.gray[50], borderColor: colors.gray[400] },
         '&:active': { backgroundColor: colors.gray[100] },
@@ -222,7 +222,7 @@ export const components = {
       padding: `${spacing[2.5]} ${spacing[3]}`,
       borderRadius: borderRadius.md,
       borderWidth: '1px',
-      borderStyle: 'solid',
+      borderStyle: 'solid' as const,
       borderColor: colors.gray[300],
       backgroundColor: colors.white,
       color: colors.gray[900],
@@ -246,7 +246,7 @@ export const components = {
       borderRadius: borderRadius.lg,
       boxShadow: shadows.sm,
       borderWidth: '1px',
-      borderStyle: 'solid',
+      borderStyle: 'solid' as const,
       borderColor: colors.gray[200],
     },
     hover: {
@@ -277,7 +277,7 @@ export const components = {
     header: {
       padding: `${spacing[4]} ${spacing[6]}`,
       borderBottomWidth: '1px',
-      borderBottomStyle: 'solid',
+      borderBottomStyle: 'solid' as const,
       borderBottomColor: colors.gray[200],
     },
     body: {
@@ -286,7 +286,7 @@ export const components = {
     footer: {
       padding: `${spacing[4]} ${spacing[6]}`,
       borderTopWidth: '1px',
-      borderTopStyle: 'solid',
+      borderTopStyle: 'solid' as const,
       borderTopColor: colors.gray[200],
       display: 'flex',
       justifyContent: 'flex-end',

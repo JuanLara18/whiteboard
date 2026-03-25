@@ -278,7 +278,7 @@ export const StyledBadge: React.FC<BadgeProps> = ({
     },
   };
 
-  const badgeStyle = {
+  const badgeStyle: React.CSSProperties = {
     display: 'inline-flex',
     alignItems: 'center',
     borderRadius: borderRadius.full,
@@ -300,6 +300,8 @@ interface TextProps {
   weight?: keyof typeof typography.weights;
   color?: string;
   style?: React.CSSProperties;
+  onClick?: React.MouseEventHandler<HTMLElement>;
+  title?: string;
 }
 
 export const StyledText: React.FC<TextProps> = ({
@@ -309,6 +311,8 @@ export const StyledText: React.FC<TextProps> = ({
   weight = 'normal',
   color = colors.gray[700],
   style,
+  onClick,
+  title,
 }) => {
   const Component = as;
   const textStyle = {
@@ -321,7 +325,7 @@ export const StyledText: React.FC<TextProps> = ({
     ...style,
   };
 
-  return <Component style={textStyle}>{children}</Component>;
+  return <Component style={textStyle} onClick={onClick} title={title}>{children}</Component>;
 };
 
 // Divider Component

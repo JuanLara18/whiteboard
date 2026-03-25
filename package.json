@@ -1,7 +1,10 @@
 {
-  "name": "whiteboard-app",
-  "private": true,
-  "version": "0.0.0",
+  "name": "whiteboard",
+  "version": "1.0.0",
+  "description": "A lightweight local-first whiteboard — freehand drawing, sticky notes, multiple boards, auto-save.",
+  "keywords": ["whiteboard", "canvas", "drawing", "sticky-notes", "local-first", "react", "konva"],
+  "license": "MIT",
+  "private": false,
   "type": "module",
   "scripts": {
     "dev": "vite",
@@ -10,16 +13,8 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@chakra-ui/react": "^3.13.0",
-    "@emotion/react": "^11.14.0",
-    "@emotion/styled": "^11.14.0",
-    "dexie": "^4.0.11",
-    "framer-motion": "^12.5.0",
     "konva": "^9.3.19",
-    "phosphor-react": "^1.4.1",
     "react": "^19.0.0",
-    "react-dnd": "^16.0.1",
-    "react-dnd-html5-backend": "^16.0.1",
     "react-dom": "^19.0.0",
     "react-konva": "^19.0.3",
     "react-router-dom": "^7.4.0",
