@@ -9,6 +9,7 @@ Sketch ideas, add sticky notes, draw freely — everything saves automatically. 
 [![React](https://img.shields.io/badge/React-19-61dafb?logo=react)](https://react.dev)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.7-3178c6?logo=typescript)](https://www.typescriptlang.org)
 [![Vite](https://img.shields.io/badge/Vite-6-646cff?logo=vite)](https://vitejs.dev)
+[![GitHub Stars](https://img.shields.io/github/stars/JuanLara18/whiteboard?style=social)](https://github.com/JuanLara18/whiteboard)
 
 </div>
 
@@ -32,7 +33,7 @@ Sketch ideas, add sticky notes, draw freely — everything saves automatically. 
 
 ```bash
 # 1. Clone the repo
-git clone https://github.com/YOUR_USERNAME/whiteboard.git
+git clone https://github.com/JuanLara18/whiteboard.git
 cd whiteboard
 
 # 2. Install dependencies
@@ -99,4 +100,4 @@ For architecture details and design decisions, see [docs/ARCHITECTURE.md](docs/A
 
 ## 📄 License
 
-MIT © see [LICENSE](LICENSE)
+MIT © [JuanLara18](https://github.com/JuanLara18) — see [LICENSE](LICENSE)

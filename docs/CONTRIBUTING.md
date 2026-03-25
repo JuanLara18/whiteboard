@@ -5,7 +5,7 @@ Thanks for your interest in contributing! This is a small, focused project — P
 ## Development Setup
 
 ```bash
-git clone https://github.com/YOUR_USERNAME/whiteboard.git
+git clone https://github.com/JuanLara18/whiteboard.git
 cd whiteboard
 npm install
 npm run dev

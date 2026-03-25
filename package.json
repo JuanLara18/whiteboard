@@ -5,6 +5,13 @@
   "keywords": ["whiteboard", "canvas", "drawing", "sticky-notes", "local-first", "react", "konva"],
   "license": "MIT",
   "private": false,
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/JuanLara18/whiteboard.git"
+  },
+  "homepage": "https://github.com/JuanLara18/whiteboard#readme",
+  "bugs": "https://github.com/JuanLara18/whiteboard/issues",
+  "author": "JuanLara18",
   "type": "module",
   "scripts": {
     "dev": "vite",
