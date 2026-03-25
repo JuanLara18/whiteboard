@@ -130,6 +130,32 @@ export const IconPlus = ({ size = 18 }: IconProps) => (
   </svg>
 );
 
+export const IconChevronDown = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+    <path d="M5 7.5l5 5 5-5" stroke="currentColor" {...S} />
+  </svg>
+);
+
+export const IconGripVertical = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="currentColor">
+    <circle cx="7" cy="5" r="1.35" />
+    <circle cx="13" cy="5" r="1.35" />
+    <circle cx="7" cy="10" r="1.35" />
+    <circle cx="13" cy="10" r="1.35" />
+    <circle cx="7" cy="15" r="1.35" />
+    <circle cx="13" cy="15" r="1.35" />
+  </svg>
+);
+
+export const IconFolder = ({ size = 16 }: IconProps) => (
+  <svg width={size} height={size} viewBox="0 0 20 20" fill="none">
+    <path
+      d="M3.5 6.5A1.5 1.5 0 015 5h3.5l1.5 1.5H15A1.5 1.5 0 0116.5 8v7a1.5 1.5 0 01-1.5 1.5H5A1.5 1.5 0 013.5 15V6.5z"
+      stroke="currentColor" {...S}
+    />
+  </svg>
+);
+
 // ── Background / Template picker ─────────────────────────────────────────────
 export const IconGrid = ({ size = 16 }: IconProps) => (
   <svg width={size} height={size} viewBox="0 0 20 20" fill="none">

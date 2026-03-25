@@ -104,7 +104,7 @@ export const Toolbar = () => {
     setImportError(null);
     try {
       const board = await importBoardFromJSON();
-      createBoard(board.name, board.template);
+      createBoard(board.name, board.template, board.folderId ?? null);
       setTimeout(() => {
         const state = useBoardStore.getState();
         const latest = state.boards.find((b: any) => b.name === board.name && b.elements.length === 0);
